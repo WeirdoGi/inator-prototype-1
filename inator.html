@@ -1,0 +1,2420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inator-Prototype-1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --surface: #f5f5f7;
+      --surface2: #ebebee;
+      --border: #dcdce4;
+      --accent: #5b4de0;
+      --accent2: #e8335a;
+      --text: #111118;
+      --muted: #7a7a8c;
+      --canvas-bg: #ffffff;
+      --font-ui: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: var(--font-ui); height: 100vh; overflow: hidden; }
+    #app { display: grid; grid-template-rows: 48px 1fr 80px; height: 100vh; }
+
+    /* Header */
+    #header {
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 20px; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px; font-weight: 600; letter-spacing: 0.08em;
+    }
+    .logo { color: var(--accent); font-size: 14px; letter-spacing: 0.12em; font-family: var(--font-mono); }
+    #screen-tabs { display: flex; gap: 4px; margin-left: auto; }
+    .tab {
+      padding: 4px 14px; border-radius: 4px; cursor: pointer;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+      color: var(--muted); border: 1px solid transparent;
+      transition: all 0.15s; font-family: var(--font-mono); background: none;
+    }
+    .tab:hover { color: var(--text); background: var(--surface2); }
+    .tab.active { color: var(--accent); border-color: var(--accent); background: rgba(124,106,247,0.1); }
+    #add-screen {
+      padding: 4px 10px; border-radius: 4px; cursor: pointer;
+      font-size: 11px; color: var(--muted); border: 1px dashed var(--border);
+      background: none; font-family: var(--font-mono); transition: all 0.15s;
+    }
+    #add-screen:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* Canvas area */
+    #canvas-area { position: relative; overflow: hidden; background: var(--canvas-bg); }
+    #grid-canvas { position: absolute; top: 0; left: 0; opacity: 0.35; pointer-events: none; }
+    #arrows-svg {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 5;
+    }
+    #elements-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+    /* Elements */
+    .wb-element {
+      position: absolute; cursor: move; user-select: none;
+      transition: box-shadow 0.15s;
+    }
+    .wb-element.selected { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 20; }
+    .wb-element:hover { z-index: 10; }
+
+    .wb-sticky {
+      padding: 12px 14px; border-radius: 6px;
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.5;
+      min-width: 140px; max-width: 260px; word-break: break-word;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .wb-box {
+      padding: 10px 16px; border-radius: 8px; border: 1.5px solid;
+      font-family: var(--font-mono); font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      min-width: 100px; text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .wb-circle {
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: 12px; text-align: center;
+      width: 90px; height: 90px; border: 1.5px solid;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .wb-chart {
+      border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface); overflow: hidden;
+      box-shadow: 0 6px 28px rgba(0,0,0,0.5);
+    }
+    .wb-chart .chart-header {
+      padding: 8px 12px 4px;
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--muted); letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .wb-chart .chart-type-badge {
+      font-size: 9px; padding: 1px 5px; border-radius: 3px;
+      background: rgba(124,106,247,0.2); color: var(--accent);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .wb-chart canvas { display: block; }
+
+    /* Color themes */
+    .color-purple { background: rgba(124,106,247,0.18); border-color: rgba(124,106,247,0.6) !important; color: #c4baff; }
+    .color-pink   { background: rgba(247,106,138,0.18); border-color: rgba(247,106,138,0.6) !important; color: #ffbacb; }
+    .color-teal   { background: rgba(80,200,180,0.18);  border-color: rgba(80,200,180,0.6)  !important; color: #9aeedd; }
+    .color-amber  { background: rgba(240,180,60,0.18);  border-color: rgba(240,180,60,0.6)  !important; color: #ffd985; }
+    .color-gray   { background: rgba(80,80,100,0.28);   border-color: rgba(120,120,150,0.5) !important; color: #c0c0d0; }
+    .color-red    { background: rgba(247,80,80,0.18);   border-color: rgba(247,80,80,0.6)   !important; color: #ffaaaa; }
+    .color-green  { background: rgba(80,200,100,0.18);  border-color: rgba(80,200,100,0.6)  !important; color: #aaffc0; }
+
+    /* Handles */
+    .delete-btn {
+      position: absolute; top: -8px; right: -8px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--accent2); color: white; border: none;
+      font-size: 10px; cursor: pointer; display: none;
+      align-items: center; justify-content: center; font-weight: bold; z-index: 30;
+    }
+    .wb-element:hover .delete-btn,
+    .wb-element.selected .delete-btn { display: flex; }
+
+    .resize-handle {
+      position: absolute; bottom: -5px; right: -5px;
+      width: 12px; height: 12px; border-radius: 2px;
+      background: var(--accent); cursor: se-resize;
+      display: none; z-index: 30;
+    }
+    .wb-element:hover .resize-handle,
+    .wb-element.selected .resize-handle { display: block; }
+
+    /* ── Toolbar dropdown ────────────────────────────────────── */
+    #toolbar-wrap {
+      position: absolute; top: 16px; left: 16px; z-index: 50;
+    }
+    #toolbar-toggle {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: all 0.15s;
+    }
+    #toolbar-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    #toolbar-toggle.open  { border-color: var(--accent); background: rgba(91,77,224,0.07); color: var(--accent); }
+    #toolbar {
+      position: absolute; top: 48px; left: 0;
+      display: none; flex-direction: column; gap: 2px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 6px; z-index: 50;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.1);
+      min-width: 160px;
+    }
+    #toolbar.open { display: flex; }
+    .tool-btn {
+      width: 100%; height: 34px; border-radius: 7px; border: none;
+      background: transparent; color: var(--text); cursor: pointer;
+      font-size: 13px; display: flex; align-items: center; gap: 10px;
+      padding: 0 10px; transition: all 0.1s; white-space: nowrap;
+      font-family: var(--font-mono); text-align: left;
+    }
+    .tool-btn .tb-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+    .tool-btn .tb-label { font-size: 11px; color: var(--muted); }
+    .tool-btn:hover { background: var(--surface2); }
+    .tool-btn:hover .tb-label { color: var(--text); }
+    .tool-btn.active { background: rgba(91,77,224,0.1); }
+    .tool-btn.active .tb-label { color: var(--accent); }
+    .tb-divider { height: 1px; background: var(--border); margin: 4px 4px; }
+    /* Draw sub-panel inside dropdown */
+    #draw-panel {
+      display: none; flex-direction: column; gap: 6px;
+      padding: 6px 8px 4px; border-top: 1px solid var(--border); margin-top: 2px;
+    }
+    #draw-panel.visible { display: flex; }
+
+    /* Input bar */
+    #input-bar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 20px; background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+    #cmd-input {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 16px;
+      color: var(--text); font-family: var(--font-mono); font-size: 13px;
+      outline: none; transition: border-color 0.15s;
+    }
+    #cmd-input:focus { border-color: var(--accent); }
+    #cmd-input::placeholder { color: var(--muted); }
+    #send-btn {
+      padding: 10px 20px; background: var(--accent); color: white;
+      border: none; border-radius: 8px; font-family: var(--font-ui);
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    #send-btn:hover { background: #9080ff; transform: translateY(-1px); }
+    #send-btn:disabled { background: var(--muted); transform: none; cursor: not-allowed; }
+    #status { font-family: var(--font-mono); font-size: 11px; color: var(--muted); min-width: 140px; text-align: right; }
+    #status.thinking { color: var(--accent); }
+    #status.error { color: var(--accent2); }
+
+    /* Mic button */
+    #mic-btn {
+      width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border);
+      background: var(--surface2); color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; flex-shrink: 0; transition: all 0.15s; position: relative;
+    }
+    #mic-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    #mic-btn.listening {
+      border-color: var(--accent2); color: var(--accent2);
+      background: rgba(247,106,138,0.12);
+    }
+    #mic-btn.listening::before {
+      content: ''; position: absolute;
+      width: 100%; height: 100%; border-radius: 50%;
+      border: 1.5px solid var(--accent2); opacity: 0.6;
+      animation: mic-pulse 1.2s ease-out infinite;
+    }
+    #mic-btn.listening::after {
+      content: ''; position: absolute;
+      width: 100%; height: 100%; border-radius: 50%;
+      border: 1.5px solid var(--accent2); opacity: 0.3;
+      animation: mic-pulse 1.2s ease-out infinite 0.4s;
+    }
+    #mic-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    #mic-btn.waiting {
+      border-color: #50c8b4; color: #50c8b4;
+      background: rgba(80,200,180,0.1);
+      animation: mic-idle 2.8s ease-in-out infinite;
+    }
+    @keyframes mic-idle {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(80,200,180,0.0); }
+      50%       { box-shadow: 0 0 0 5px rgba(80,200,180,0.18); }
+    }
+    .no-support-tip {
+      display: none; position: absolute; bottom: 52px; left: 50%;
+      transform: translateX(-50%); background: var(--surface);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 6px 10px; font-family: var(--font-mono); font-size: 10px;
+      color: var(--accent2); white-space: nowrap; z-index: 200; pointer-events: none;
+    }
+    #mic-wrap { position: relative; display: flex; align-items: center; }
+    #mic-wrap:hover .no-support-tip { display: block; }
+    @keyframes mic-pulse {
+      0%   { transform: scale(1);   opacity: 0.6; }
+      100% { transform: scale(1.7); opacity: 0; }
+    }
+
+    /* Log */
+    #log {
+      position: absolute; bottom: 8px; right: 12px;
+      width: 300px; max-height: 160px; overflow-y: auto;
+      background: rgba(255,255,255,0.96); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 10px;
+      font-family: var(--font-mono); font-size: 10px; color: var(--muted); z-index: 100;
+    }
+    .log-entry { margin-bottom: 3px; line-height: 1.4; }
+    .log-entry.action { color: #7c6af7; }
+    .log-entry.error  { color: var(--accent2); }
+    .log-entry.info   { color: #50c8b4; }
+
+    /* API key bar */
+    #api-key-bar {
+      position: absolute; top: 0; left: 0; right: 0;
+      background: #fff3f5; border-bottom: 2px solid #e8335a;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px; font-family: var(--font-mono); font-size: 12px; color: #c0002a; z-index: 200;
+    }
+    #api-key-bar input {
+      flex: 1; background: #ffffff; border: 1.5px solid #e8335a;
+      border-radius: 6px; padding: 6px 10px; color: #111118;
+      font-family: var(--font-mono); font-size: 12px; outline: none;
+    }
+    #api-key-bar input:focus { border-color: #c0002a; box-shadow: 0 0 0 3px rgba(232,51,90,0.15); }
+    #api-key-bar button {
+      padding: 6px 16px; background: #e8335a; color: white;
+      border: none; border-radius: 6px; cursor: pointer;
+      font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+      transition: background 0.15s;
+    }
+    #api-key-bar button:hover { background: #c0002a; }
+    #api-key-bar .key-hint { color: #888; font-size: 10px; }
+
+    /* Edit popover */
+    #edit-popover {
+      position: absolute; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 14px 12px; z-index: 500; display: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5); min-width: 230px;
+    }
+    #edit-popover h4 {
+      font-size: 10px; color: var(--muted); letter-spacing: 0.1em;
+      margin-bottom: 10px; font-family: var(--font-mono); text-transform: uppercase;
+    }
+    #edit-popover label { font-family: var(--font-mono); font-size: 10px; color: var(--muted); display: block; margin-bottom: 3px; }
+    #edit-popover input, #edit-popover select {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 10px; color: var(--text);
+      font-family: var(--font-mono); font-size: 12px; outline: none; margin-bottom: 10px;
+    }
+    #edit-popover input:focus, #edit-popover select:focus { border-color: var(--accent); }
+    .size-row { display: flex; gap: 5px; margin-bottom: 10px; }
+    .size-btn {
+      flex: 1; padding: 5px 0; border: 1px solid var(--border); border-radius: 5px;
+      background: var(--surface2); color: var(--muted); cursor: pointer;
+      font-family: var(--font-mono); font-size: 11px; transition: all 0.12s;
+    }
+    .size-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .size-btn.active { border-color: var(--accent); background: rgba(124,106,247,0.2); color: var(--accent); }
+    #edit-apply {
+      width: 100%; padding: 7px; background: var(--accent); color: white;
+      border: none; border-radius: 6px; cursor: pointer; font-family: var(--font-ui);
+      font-size: 12px; font-weight: 600;
+    }
+    #edit-apply:hover { background: #9080ff; }
+    #edit-close {
+      position: absolute; top: 8px; right: 10px;
+      background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px;
+    }
+
+    /* Drawing toolbar panel */
+    #draw-panel {
+      display: none; flex-direction: column; gap: 6px;
+      padding-top: 6px; margin-top: 2px;
+      border-top: 1px solid var(--border);
+    }
+    #draw-panel.visible { display: flex; }
+    .color-swatch {
+      width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+      border: 2px solid transparent; transition: border-color 0.12s; flex-shrink: 0;
+    }
+    .color-swatch.active { border-color: white; }
+    #swatch-row { display: flex; flex-direction: row; gap: 5px; align-items: center; flex-wrap: wrap; padding: 2px 0; }
+    .stroke-btn {
+      width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--surface2); cursor: pointer; display: flex;
+      align-items: center; justify-content: center; transition: all 0.12s; color: var(--muted);
+    }
+    .stroke-btn:hover { border-color: var(--accent); }
+    .stroke-btn.active { border-color: var(--accent); background: rgba(124,106,247,0.2); color: var(--accent); }
+    .stroke-btn svg { display: block; }
+    /* Canvas cursor modes */
+    #canvas-area.drawing-mode,
+    #canvas-area.drawing-mode * { cursor: crosshair !important; }
+    #canvas-area.eraser-mode,
+    #canvas-area.eraser-mode *  { cursor: cell !important; }
+    /* SVG drawing layer — sits on top, full size, only interactive when draw tool active */
+    #drawing-svg {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 15;
+    }
+    #drawing-svg.interactive { pointer-events: all; }
+
+    /* ── Always-on face camera (background, no UI) ───────────── */
+    #face-video { display: none; }  /* hidden — just feeds MediaPipe */
+
+    /* Face indicator pill in header */
+    #face-indicator {
+      display: flex; align-items: center; gap: 6px;
+      font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+      padding: 3px 10px; border-radius: 20px;
+      border: 1px solid var(--border); background: var(--surface2);
+      transition: all 0.3s; user-select: none;
+    }
+    #face-indicator .face-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--border); transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    #face-indicator.detected { border-color: #44cc77; color: #44cc77; }
+    #face-indicator.detected .face-dot { background: #44cc77; animation: cam-blink 1.4s ease-in-out infinite; }
+    #face-indicator.soft-active { border-color: var(--accent); color: var(--accent); }
+    #face-indicator.soft-active .face-dot { background: var(--accent); animation: cam-blink 0.6s ease-in-out infinite; }
+
+    /* ── Camera preview ───────────────────────────────────────── */
+    #camera-preview {
+      position: absolute;
+      bottom: 16px; left: 70px;
+      width: 200px; height: 150px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1.5px solid var(--border);
+      background: #000;
+      z-index: 60;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      display: none; /* hidden until activated */
+    }
+    #camera-preview.active { display: block; }
+    #camera-preview video  { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+    #camera-preview canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+    #camera-preview .cam-label {
+      position: absolute; top: 6px; left: 8px;
+      font-family: var(--font-mono); font-size: 9px;
+      color: rgba(255,255,255,0.7); letter-spacing: 0.06em;
+      pointer-events: none; z-index: 2;
+    }
+    #camera-preview .cam-status {
+      position: absolute; top: 6px; right: 8px;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #ff4444;
+    }
+    #camera-preview .cam-status.tracking { background: #44ff88; animation: cam-blink 1s ease-in-out infinite; }
+    @keyframes cam-blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* Finger pointer dot on the whiteboard */
+    #finger-dot {
+      position: absolute;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: rgba(91,77,224,0.7);
+      border: 2px solid #5b4de0;
+      pointer-events: none;
+      z-index: 200;
+      display: none;
+      transform: translate(-50%, -50%);
+      transition: left 0.04s linear, top 0.04s linear;
+      box-shadow: 0 0 0 4px rgba(91,77,224,0.2);
+    }
+    #finger-dot.visible { display: block; }
+
+    /* Camera toggle button in toolbar */
+    #tool-camera { position: relative; }
+    #tool-camera .cam-dot {
+      position: absolute; top: 4px; right: 4px;
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #ff4444; display: none;
+    }
+    #tool-camera.active .cam-dot { display: block; background: #44ff88; }
+
+    /* ── Offset slider panel ─────────────────────────────────── */
+    #offset-panel {
+      position: absolute; bottom: 176px; left: 70px;
+      width: 200px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 12px; z-index: 61;
+      display: none; flex-direction: column; gap: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    #offset-panel.active { display: flex; }
+    #offset-panel .op-row {
+      display: flex; align-items: center; gap: 8px;
+    }
+    #offset-panel label {
+      font-family: var(--font-mono); font-size: 10px;
+      color: var(--muted); width: 14px; flex-shrink: 0;
+    }
+    #offset-panel input[type=range] {
+      flex: 1; accent-color: var(--accent); height: 3px; cursor: pointer;
+    }
+    #offset-panel .op-val {
+      font-family: var(--font-mono); font-size: 10px;
+      color: var(--text); width: 38px; text-align: right; flex-shrink: 0;
+    }
+    #offset-panel .op-title {
+      font-family: var(--font-mono); font-size: 9px;
+      color: var(--muted); letter-spacing: 0.08em;
+      text-transform: uppercase; margin-bottom: 2px;
+    }
+    #offset-panel .op-reset {
+      font-family: var(--font-mono); font-size: 9px;
+      color: var(--muted); background: none;
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 2px 8px; cursor: pointer; align-self: flex-end;
+    }
+    #offset-panel .op-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Silence timer panel */
+    #silence-panel {
+      position: absolute; bottom: 16px; left: 280px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 12px; z-index: 61;
+      display: none; flex-direction: column; gap: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1); min-width: 200px;
+    }
+    #silence-panel.active { display: flex; }
+    #silence-panel .op-title { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px; }
+    #silence-panel .op-row   { display: flex; align-items: center; gap: 8px; }
+    #silence-panel label     { font-family: var(--font-mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+    #silence-panel input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+    #silence-panel .op-val   { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--text); min-width: 32px; text-align: right; }
+    #silence-panel .op-hint  { font-family: var(--font-mono); font-size: 9px; color: var(--muted); line-height: 1.5; }
+    #calib-recalibrate {
+      position: absolute; top: 4px; right: 4px;
+      width: 28px; height: 28px; border-radius: 6px; border: none;
+      background: transparent; color: var(--muted); cursor: pointer;
+      font-size: 13px; display: flex; align-items: center; justify-content: center;
+      transition: all 0.12s;
+    }
+    #calib-recalibrate:hover { background: var(--surface2); color: var(--text); }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div id="header">
+    <span class="logo">◈ INATOR-PROTOTYPE-1</span>
+    <div id="screen-tabs"></div>
+    <button id="add-screen">+ screen</button>
+    <div id="face-indicator" title="Face detection status">
+      <span class="face-dot"></span>
+      <span id="face-label">no face</span>
+    </div>
+    <!-- Board session ID — share this with others to collaborate -->
+    <div id="board-id-wrap" style="display:flex;align-items:center;gap:6px;margin-left:auto">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">BOARD</span>
+      <input id="board-id-input" placeholder="session ID" style="font-family:var(--font-mono);font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);width:110px;outline:none" />
+      <button id="board-join-btn" style="font-family:var(--font-mono);font-size:10px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer">Join</button>
+      <span id="sync-status" style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">not connected</span>
+    </div>
+    <!-- Hidden video for always-on face detection -->
+    <video id="face-video" playsinline autoplay muted></video>
+  </div>
+
+  <div id="canvas-area">
+    <canvas id="grid-canvas"></canvas>
+    <svg id="arrows-svg"></svg>
+    <div id="elements-layer"></div>
+
+    <div id="toolbar-wrap">
+      <button id="toolbar-toggle" title="Tools">☰</button>
+      <div id="toolbar">
+        <!-- Select -->
+        <button class="tool-btn active" id="tool-select">
+          <span class="tb-icon">↖</span><span class="tb-label">Select</span>
+        </button>
+        <div class="tb-divider"></div>
+        <!-- Draw tools -->
+        <button class="tool-btn" id="tool-draw">
+          <span class="tb-icon">✏️</span><span class="tb-label">Draw</span>
+        </button>
+        <button class="tool-btn" id="tool-eraser">
+          <span class="tb-icon">🧹</span><span class="tb-label">Eraser</span>
+        </button>
+        <button class="tool-btn" id="tool-clear">
+          <span class="tb-icon">⌫</span><span class="tb-label">Clear drawings</span>
+        </button>
+        <!-- Draw sub-panel (colors + stroke width) -->
+        <div id="draw-panel">
+          <div id="swatch-row">
+            <div class="color-swatch active" data-color="#111118" style="background:#111118" title="Black"></div>
+            <div class="color-swatch" data-color="#7c6af7" style="background:#7c6af7" title="Purple"></div>
+            <div class="color-swatch" data-color="#f76a8a" style="background:#f76a8a" title="Pink"></div>
+            <div class="color-swatch" data-color="#50c8b4" style="background:#50c8b4" title="Teal"></div>
+            <div class="color-swatch" data-color="#f0b43c" style="background:#f0b43c" title="Amber"></div>
+            <div class="color-swatch" data-color="#ff6666" style="background:#ff6666" title="Red"></div>
+            <div class="color-swatch" data-color="#222228" style="background:#222228;border:1px solid #444" title="Dark"></div>
+          </div>
+          <div style="display:flex;gap:4px">
+            <button class="stroke-btn active" id="stroke-thin" title="Thin">
+              <svg width="18" height="18"><line x1="3" y1="9" x2="15" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <button class="stroke-btn" id="stroke-medium" title="Medium">
+              <svg width="18" height="18"><line x1="3" y1="9" x2="15" y2="9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            </button>
+            <button class="stroke-btn" id="stroke-thick" title="Thick">
+              <svg width="18" height="18"><line x1="3" y1="9" x2="15" y2="9" stroke="currentColor" stroke-width="5.5" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="tb-divider"></div>
+        <!-- Camera + Utilities -->
+        <button class="tool-btn" id="tool-camera" title="Toggle Presence">
+          <span class="tb-icon">📷</span><span class="tb-label">Presence<span class="cam-dot" style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#ff4444;margin-left:4px;vertical-align:middle"></span></span>
+        </button>
+        <button class="tool-btn" id="tool-fullscreen">
+          <span class="tb-icon">⛶</span><span class="tb-label">Fullscreen</span>
+        </button>
+        <button class="tool-btn" id="tool-silence">
+          <span class="tb-icon">⏱</span><span class="tb-label">Silence timer</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- SVG layer for freehand drawings -->
+    <svg id="drawing-svg"></svg>
+
+    <!-- Finger pointer dot (follows index fingertip on whiteboard) -->
+    <div id="finger-dot"></div>
+
+    <!-- Camera preview (bottom-left, shows webcam + landmark overlay) -->
+    <div id="camera-preview">
+      <span class="cam-label">PRESENCE</span>
+      <span class="cam-status" id="cam-status"></span>
+      <video id="cam-video" playsinline></video>
+      <canvas id="cam-canvas"></canvas>
+      <button id="calib-recalibrate" title="Adjust offset">⊹</button>
+    </div>
+
+    <!-- Silence timer panel -->
+    <div id="silence-panel">
+      <span class="op-title">Auto-send silence timer</span>
+      <div class="op-row">
+        <label>Delay</label>
+        <input type="range" id="silence-slider" min="0.5" max="4" value="1.8" step="0.1" />
+        <span class="op-val" id="silence-val">1.8s</span>
+      </div>
+      <p class="op-hint">After you stop talking, waits this long<br>then auto-sends. Set higher if it cuts you off.</p>
+      <div class="op-row" style="justify-content:space-between">
+        <label style="font-size:10px">Auto-send</label>
+        <input type="checkbox" id="silence-enabled" checked style="accent-color:var(--accent);cursor:pointer;width:16px;height:16px" />
+      </div>
+    </div>
+
+    <!-- Offset slider panel — nudge the dot to match your finger -->
+    <div id="offset-panel">
+      <span class="op-title">Adjust finger dot offset</span>
+      <div class="op-row">
+        <label>X</label>
+        <input type="range" id="offset-x" min="-400" max="400" value="0" step="1" />
+        <span class="op-val" id="offset-x-val">0</span>
+      </div>
+      <div class="op-row">
+        <label>Y</label>
+        <input type="range" id="offset-y" min="-300" max="300" value="0" step="1" />
+        <span class="op-val" id="offset-y-val">0</span>
+      </div>
+      <div class="op-row" style="justify-content:space-between;margin-top:2px">
+        <button class="op-reset" id="offset-reset">Reset</button>
+        <button class="op-reset" id="flip-x-btn">Flip X</button>
+      </div>
+    </div>
+
+    <!-- Manual edit popover (double-click any element) -->
+    <div id="edit-popover">
+      <button id="edit-close">×</button>
+      <h4>Edit element</h4>
+      <label>Label</label>
+      <input id="edit-label" placeholder="Label text" />
+      <label>Color</label>
+      <select id="edit-color">
+        <option value="purple">Purple</option>
+        <option value="pink">Pink</option>
+        <option value="teal">Teal</option>
+        <option value="amber">Amber</option>
+        <option value="gray">Gray</option>
+        <option value="red">Red</option>
+        <option value="green">Green</option>
+      </select>
+      <label>Size</label>
+      <div class="size-row">
+        <button class="size-btn" data-size="sm">S</button>
+        <button class="size-btn active" data-size="md">M</button>
+        <button class="size-btn" data-size="lg">L</button>
+        <button class="size-btn" data-size="xl">XL</button>
+      </div>
+      <button id="edit-apply">Apply changes</button>
+    </div>
+
+    <div id="api-key-bar">
+      <span>API key required:</span>
+      <input id="api-key-input" type="password" placeholder="sk-ant-..." />
+      <button id="api-key-save">Save</button>
+      <span class="key-hint">Stored in memory only · not saved to disk</span>
+    </div>
+
+    <div id="log"></div>
+  </div>
+
+  <div id="input-bar">
+    <div id="mic-wrap">
+      <button id="mic-btn" title="Hold to speak">🎤</button>
+      <span class="no-support-tip" id="mic-tip" style="display:none"></span>
+    </div>
+    <input id="cmd-input" placeholder='Say or type: "add a bar chart of monthly revenue" · "change Frontend to teal" · "search for Apple stock price"' />
+    <button id="send-btn">Send</button>
+    <span id="status">ready</span>
+  </div>
+</div>
+
+<script>
+// Inator-Prototype-1 v1.4 — wake word + sleep word fix
+
+// ── Global error catcher — shows any JS crash visibly ──────────
+window.onerror = (msg, src, line, col, err) => {
+  const bar = document.getElementById('api-key-bar');
+  if (bar) {
+    bar.style.background = '#fff0f0';
+    bar.style.borderColor = '#e8335a';
+    bar.innerHTML = `<span style="color:#c0002a;font-family:monospace;font-size:11px">
+      ⚠ JS error on line ${line}: ${msg} — open DevTools (F12) for details
+    </span>`;
+  }
+};
+
+// ── Config ─────────────────────────────────────────────────────
+const API_URL = "https://api.anthropic.com/v1/messages";
+let API_KEY = "";
+
+// ── Supabase config ────────────────────────────────────────────
+const SUPABASE_URL = "https://fnojfcrpghkiwzmbtsvp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_hxNZcU5-vzkXnkgszurj9g_FRxSwxTr";
+let sbClient        = null;  // initialised after page load
+let boardId         = null;  // current session ID
+let isSyncing       = false; // prevent echo when applying remote changes
+let realtimeChannel = null;
+
+function initSupabase() {
+  if (window.supabase && window.supabase.createClient) {
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return true;
+  }
+  return false;
+}
+
+// ── State ──────────────────────────────────────────────────────
+let screens        = { 1: [], 2: [] };
+let activeScreen   = 1;
+let nextId         = 1;
+let chartInstances = {};
+
+const SIZE_PRESETS = {
+  sm: { box:[100,40],  sticky:[140,60],  circle:[70,70],   chart:[240,180] },
+  md: { box:[140,44],  sticky:[180,80],  circle:[90,90],   chart:[320,220] },
+  lg: { box:[200,50],  sticky:[240,100], circle:[120,120], chart:[420,280] },
+  xl: { box:[280,56],  sticky:[300,130], circle:[160,160], chart:[560,360] },
+};
+
+const CHART_COLORS = ['#7c6af7','#f76a8a','#50c8b4','#f0b43c','#7bc0ff','#ff9966','#aaf07c'];
+
+let dragging = null, dragOffset = { x:0, y:0 };
+let resizing = null, resizeStart = {};
+let editingId = null;
+
+// ── DOM refs ───────────────────────────────────────────────────
+const canvasArea  = document.getElementById('canvas-area');
+const elemLayer   = document.getElementById('elements-layer');
+const arrowsSvg   = document.getElementById('arrows-svg');
+const cmdInput    = document.getElementById('cmd-input');
+const sendBtn     = document.getElementById('send-btn');
+const statusEl    = document.getElementById('status');
+const logEl       = document.getElementById('log');
+const tabsEl      = document.getElementById('screen-tabs');
+const editPopover = document.getElementById('edit-popover');
+
+// ── API key ────────────────────────────────────────────────────
+document.getElementById('api-key-save').onclick = () => {
+  const btn        = document.getElementById('api-key-save');
+  const input      = document.getElementById('api-key-input');
+  const bar        = document.getElementById('api-key-bar');
+  const keyVal     = input.value;
+
+  // Visual: button shows it was clicked immediately
+  btn.textContent  = '…';
+  btn.disabled     = true;
+
+  setTimeout(() => {
+    const cleaned = keyVal.replace(/[\s\u200B\uFEFF]/g, '');
+
+    if (!cleaned) {
+      btn.textContent = 'Save';
+      btn.disabled    = false;
+      input.style.borderColor = '#e8335a';
+      input.placeholder = 'Key was empty — paste it here';
+      addLog('API key was empty — nothing was saved.', 'error');
+      return;
+    }
+
+    if (cleaned.length < 20) {
+      btn.textContent = 'Save';
+      btn.disabled    = false;
+      input.style.borderColor = '#e8335a';
+      addLog(`Key too short (${cleaned.length} chars) — check you copied the full key.`, 'error');
+      return;
+    }
+
+    // All good
+    API_KEY          = cleaned;
+    btn.textContent  = '✓ Saved';
+    btn.style.background = '#44cc77';
+    input.style.borderColor = '#44cc77';
+
+    setTimeout(() => {
+      bar.style.display = 'none';
+      addLog(`API key set (${API_KEY.slice(0,12)}…). Ready.`, 'info');
+    }, 600);
+  }, 150); // small delay so the "…" state is visible
+};
+
+// ── Grid ───────────────────────────────────────────────────────
+function drawGrid() {
+  const c = document.getElementById('grid-canvas');
+  c.width = canvasArea.offsetWidth; c.height = canvasArea.offsetHeight;
+  const ctx = c.getContext('2d');
+  ctx.strokeStyle = '#d8d8e0'; ctx.lineWidth = 0.5;
+  for (let x = 0; x < c.width; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,c.height); ctx.stroke(); }
+  for (let y = 0; y < c.height; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(c.width,y); ctx.stroke(); }
+}
+drawGrid();
+window.addEventListener('resize', () => { drawGrid(); renderElements(); });
+
+// ── Tabs ───────────────────────────────────────────────────────
+function renderTabs() {
+  tabsEl.innerHTML = '';
+  Object.keys(screens).forEach(id => {
+    const btn = document.createElement('button');
+    btn.className   = 'tab' + (parseInt(id) === activeScreen ? ' active' : '');
+    btn.textContent = 'Screen ' + id;
+    btn.onclick = () => { activeScreen = parseInt(id); renderTabs(); renderElements(); };
+    tabsEl.appendChild(btn);
+  });
+}
+document.getElementById('add-screen').onclick = () => {
+  const id = Math.max(...Object.keys(screens).map(Number)) + 1;
+  screens[id] = [];
+  if (typeof drawingHistory !== 'undefined') drawingHistory[id] = [];
+  activeScreen = id; renderTabs(); renderElements();
+  addLog(`Created screen ${id}`, 'info');
+};
+
+// ── Helpers ────────────────────────────────────────────────────
+function colorClass(c) {
+  return 'color-' + (['purple','pink','teal','amber','gray','red','green'].includes(c) ? c : 'purple');
+}
+
+function getSize(el) {
+  if (el.w && el.h) return { w: el.w, h: el.h };
+  const preset = SIZE_PRESETS[el.size || 'md'];
+  if (el.type === 'chart')  return { w: preset.chart[0],  h: preset.chart[1] };
+  if (el.type === 'circle') return { w: preset.circle[0], h: preset.circle[1] };
+  if (el.type === 'sticky') return { w: preset.sticky[0], h: preset.sticky[1] };
+  return { w: preset.box[0], h: preset.box[1] };
+}
+
+// ── Chart config builder ───────────────────────────────────────
+function buildChartConfig(el) {
+  const labels = el.chartLabels || ['A','B','C','D','E'];
+  const values = el.chartValues || [40,70,55,85,60];
+  const ctype  = el.chartType   || 'bar';
+  const isPie  = ctype === 'pie' || ctype === 'doughnut';
+
+  const dataset = {
+    label: el.label || 'Data',
+    data: values,
+    borderWidth: 1.5,
+    borderRadius: ctype === 'bar' ? 4 : 0,
+    ...(isPie ? {
+      backgroundColor: CHART_COLORS.slice(0, values.length),
+      borderColor:     CHART_COLORS.slice(0, values.length).map(c => c + '99'),
+    } : {
+      backgroundColor: ctype === 'line' ? 'rgba(124,106,247,0.15)' : 'rgba(124,106,247,0.72)',
+      borderColor: '#7c6af7',
+      ...(ctype === 'line' ? { fill: true, tension: 0.4, pointRadius: 3 } : {}),
+    })
+  };
+
+  return {
+    type: ctype,
+    data: { labels, datasets: [dataset] },
+    options: {
+      responsive: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: {
+          display: isPie,
+          position: 'bottom',
+          labels: { color:'#7a7a8c', font:{ family:'DM Mono', size:10 }, boxWidth:10, padding:8 }
+        },
+        tooltip: {
+          backgroundColor:'#ffffff', titleColor:'#111118',
+          bodyColor:'#7a7a8c', borderColor:'#dcdce4', borderWidth:1
+        }
+      },
+      scales: isPie ? {} : {
+        x: { ticks:{ color:'#7a7a8c', font:{ family:'DM Mono', size:10 } }, grid:{ color:'rgba(0,0,0,0.06)' } },
+        y: { ticks:{ color:'#9090a8', font:{ family:'DM Mono', size:10 } }, grid:{ color:'rgba(255,255,255,0.05)' } }
+      }
+    }
+  };
+}
+
+// ── Render ─────────────────────────────────────────────────────
+function renderElements() {
+  Object.values(chartInstances).forEach(c => c.destroy());
+  chartInstances = {};
+  elemLayer.innerHTML = '';
+  arrowsSvg.innerHTML = '';
+
+  const els  = screens[activeScreen] || [];
+  const byId = {};
+  els.forEach(e => { byId[e.id] = e; });
+
+  els.forEach(el => {
+    if (el.type === 'arrow') return;
+    const { w, h } = getSize(el);
+    const div = document.createElement('div');
+    div.id = 'el-' + el.id;
+    div.dataset.id = el.id;
+    div.style.left = el.x + 'px';
+    div.style.top  = el.y + 'px';
+
+    if (el.type === 'chart') {
+      div.className    = 'wb-element wb-chart';
+      div.style.width  = w + 'px';
+      div.style.height = h + 'px';
+
+      const header = document.createElement('div');
+      header.className = 'chart-header';
+      header.innerHTML = `<span>${el.label || 'Chart'}</span><span class="chart-type-badge">${el.chartType || 'bar'}</span>`;
+      div.appendChild(header);
+
+      const cvs = document.createElement('canvas');
+      cvs.width  = w;
+      cvs.height = h - 33;
+      div.appendChild(cvs);
+
+      div.addEventListener('mousedown', startDrag);
+      attachHandles(div, el.id);
+      elemLayer.appendChild(div);
+
+      requestAnimationFrame(() => {
+        const cfg = buildChartConfig(el);
+        chartInstances[el.id] = new Chart(cvs, cfg);
+      });
+    } else {
+      div.className = `wb-element wb-${el.type} ${colorClass(el.color)}`;
+      if (el.type === 'circle') {
+        div.style.width  = w + 'px';
+        div.style.height = h + 'px';
+      } else {
+        div.style.width  = w + 'px';
+        if (el.type !== 'sticky') div.style.height = h + 'px';
+      }
+      div.textContent = el.label || '';
+      div.addEventListener('mousedown', startDrag);
+      attachHandles(div, el.id);
+      elemLayer.appendChild(div);
+    }
+  });
+
+  // Arrows
+  ensureArrowDefs();
+  els.filter(e => e.type === 'arrow').forEach(a => {
+    if (byId[a.from] && byId[a.to]) drawArrow(byId[a.from], byId[a.to], a.label);
+  });
+}
+
+function attachHandles(div, id) {
+  const del = document.createElement('button');
+  del.className   = 'delete-btn'; del.textContent = '×';
+  del.onclick     = e => { e.stopPropagation(); removeElement(id); };
+  div.appendChild(del);
+
+  const res = document.createElement('div');
+  res.className = 'resize-handle';
+  res.addEventListener('mousedown', e => { e.stopPropagation(); startResize(e, id); });
+  div.appendChild(res);
+
+  div.addEventListener('dblclick', e => { e.stopPropagation(); openEditPopover(id, div); });
+}
+
+// ── Arrows ─────────────────────────────────────────────────────
+function ensureArrowDefs() {
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  defs.innerHTML = `<marker id="ah" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#7c6af7"/></marker>`;
+  arrowsSvg.appendChild(defs);
+}
+
+function getCenter(el) {
+  const { w, h } = getSize(el);
+  return { x: el.x + w/2, y: el.y + h/2 };
+}
+
+function drawArrow(from, to, label) {
+  const f = getCenter(from), t = getCenter(to);
+  const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+  line.setAttribute('x1',f.x); line.setAttribute('y1',f.y);
+  line.setAttribute('x2',t.x); line.setAttribute('y2',t.y);
+  line.setAttribute('stroke','#7c6af7'); line.setAttribute('stroke-width','1.5');
+  line.setAttribute('stroke-dasharray','5 3'); line.setAttribute('marker-end','url(#ah)');
+  arrowsSvg.appendChild(line);
+  if (label) {
+    const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('x',(f.x+t.x)/2); txt.setAttribute('y',(f.y+t.y)/2-6);
+    txt.setAttribute('text-anchor','middle'); txt.setAttribute('fill','#6b6b80');
+    txt.setAttribute('font-size','11'); txt.setAttribute('font-family','DM Mono,monospace');
+    txt.textContent = label;
+    arrowsSvg.appendChild(txt);
+  }
+}
+
+function removeElement(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+  screens[activeScreen] = screens[activeScreen].filter(e => e.id !== id && e.from !== id && e.to !== id);
+  renderElements();
+}
+
+// ── Drag ───────────────────────────────────────────────────────
+function startDrag(e) {
+  if (e.target.classList.contains('resize-handle') || e.target.classList.contains('delete-btn')) return;
+  const el = e.currentTarget;
+  dragging = { domEl: el, id: parseInt(el.dataset.id) };
+  const rect = el.getBoundingClientRect();
+  dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  el.classList.add('selected');
+  e.preventDefault();
+}
+
+// ── Resize ─────────────────────────────────────────────────────
+function startResize(e, id) {
+  const data = screens[activeScreen].find(x => x.id === id);
+  if (!data) return;
+  const { w, h } = getSize(data);
+  resizing = { id, startX: e.clientX, startY: e.clientY, startW: w, startH: h };
+  e.preventDefault();
+}
+
+document.addEventListener('mousemove', e => {
+  if (dragging) {
+    const areaRect = canvasArea.getBoundingClientRect();
+    const nx = e.clientX - areaRect.left - dragOffset.x;
+    const ny = e.clientY - areaRect.top  - dragOffset.y;
+    const data = screens[activeScreen].find(x => x.id === dragging.id);
+    if (data) { data.x = nx; data.y = ny; }
+    dragging.domEl.style.left = nx + 'px';
+    dragging.domEl.style.top  = ny + 'px';
+    // Fast arrow redraw only
+    arrowsSvg.innerHTML = '';
+    ensureArrowDefs();
+    const byId = {};
+    screens[activeScreen].forEach(x => { byId[x.id] = x; });
+    screens[activeScreen].filter(x => x.type === 'arrow').forEach(a => {
+      if (byId[a.from] && byId[a.to]) drawArrow(byId[a.from], byId[a.to], a.label);
+    });
+  }
+  if (resizing) {
+    const dx   = e.clientX - resizing.startX;
+    const dy   = e.clientY - resizing.startY;
+    const data = screens[activeScreen].find(x => x.id === resizing.id);
+    if (!data) return;
+    data.w = Math.max(80,  resizing.startW + dx);
+    data.h = Math.max(40,  resizing.startH + dy);
+    const domEl = document.getElementById('el-' + resizing.id);
+    if (domEl) {
+      domEl.style.width  = data.w + 'px';
+      domEl.style.height = data.h + 'px';
+      if (data.type === 'chart' && chartInstances[data.id]) {
+        const cvs = domEl.querySelector('canvas');
+        if (cvs) { cvs.width = data.w; cvs.height = data.h - 33; chartInstances[data.id].resize(data.w, data.h - 33); }
+      }
+    }
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (dragging) { dragging.domEl.classList.remove('selected'); dragging = null; }
+  if (resizing) { resizing = null; renderElements(); }
+});
+
+// ── Drawing state ─────────────────────────────────────────────
+let activeTool     = 'select';   // 'select' | 'draw' | 'eraser'
+let drawColor      = '#111118';
+let drawWidth      = 2;
+let isDrawing      = false;
+let currentStroke  = null;      // { id, points:[], color, width } being drawn
+let drawingHistory = {};        // screenId → [stroke, ...]
+
+const drawingSvg  = document.getElementById('drawing-svg');
+const drawPanel   = document.getElementById('draw-panel');
+
+const STROKE_WIDTHS = { thin: 2, medium: 5, thick: 10 };
+const ERASER_WIDTH  = 24;
+
+// Initialise history for existing screens
+Object.keys(screens).forEach(id => { drawingHistory[parseInt(id)] = []; });
+
+// Re-render drawings whenever screen changes (hook into renderElements)
+const _origRender = renderElements;
+renderElements = function() {
+  _origRender();
+  renderDrawings();
+};
+
+function renderDrawings() {
+  drawingSvg.innerHTML = '';
+  const strokes = drawingHistory[activeScreen] || [];
+  strokes.forEach(s => drawingSvg.appendChild(makePath(s)));
+}
+
+function makePath(stroke) {
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', pointsToD(stroke.points));
+  path.setAttribute('stroke', stroke.color);
+  path.setAttribute('stroke-width', stroke.width);
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  path.setAttribute('fill', 'none');
+  path.dataset.strokeId = stroke.id;
+  return path;
+}
+
+function pointsToD(pts) {
+  if (!pts || pts.length === 0) return '';
+  if (pts.length === 1) return `M${pts[0].x} ${pts[0].y} L${pts[0].x+0.1} ${pts[0].y+0.1}`;
+  let d = `M${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length; i++) {
+    // Smooth curve through midpoints
+    const mx = (pts[i-1].x + pts[i].x) / 2;
+    const my = (pts[i-1].y + pts[i].y) / 2;
+    d += ` Q${pts[i-1].x} ${pts[i-1].y} ${mx} ${my}`;
+  }
+  d += ` L${pts[pts.length-1].x} ${pts[pts.length-1].y}`;
+  return d;
+}
+
+function getCanvasPos(e) {
+  const r = canvasArea.getBoundingClientRect();
+  return { x: Math.round(e.clientX - r.left), y: Math.round(e.clientY - r.top) };
+}
+
+// ── Drawing mouse events (on the SVG layer itself) ────────────
+// drawingSvg has pointer-events:all when a draw tool is active,
+// so it receives every mouse event over the full canvas area.
+drawingSvg.addEventListener('mousedown', e => {
+  if (activeTool !== 'draw' && activeTool !== 'eraser') return;
+  isDrawing = true;
+  const pos = getCanvasPos(e);
+  if (activeTool === 'draw') {
+    currentStroke = {
+      id: 'stroke-' + Date.now(),
+      points: [pos],
+      color: drawColor,
+      width: drawWidth
+    };
+    const path = makePath(currentStroke);
+    path.id = 'live-stroke';
+    drawingSvg.appendChild(path);
+  }
+  e.preventDefault();
+});
+
+drawingSvg.addEventListener('mousemove', e => {
+  if (!isDrawing) return;
+  const pos = getCanvasPos(e);
+  if (activeTool === 'draw' && currentStroke) {
+    currentStroke.points.push(pos);
+    const live = document.getElementById('live-stroke');
+    if (live) live.setAttribute('d', pointsToD(currentStroke.points));
+  } else if (activeTool === 'eraser') {
+    eraseAt(pos);
+  }
+});
+
+drawingSvg.addEventListener('mouseup', e => {
+  if (!isDrawing) return;
+  isDrawing = false;
+  if (activeTool === 'draw' && currentStroke && currentStroke.points.length > 0) {
+    if (!drawingHistory[activeScreen]) drawingHistory[activeScreen] = [];
+    drawingHistory[activeScreen].push(currentStroke);
+    currentStroke = null;
+    renderDrawings();
+  }
+});
+
+drawingSvg.addEventListener('mouseleave', e => {
+  if (isDrawing && activeTool === 'draw' && currentStroke) {
+    if (!drawingHistory[activeScreen]) drawingHistory[activeScreen] = [];
+    drawingHistory[activeScreen].push(currentStroke);
+    currentStroke = null;
+    isDrawing = false;
+    renderDrawings();
+  }
+});
+
+function eraseAt(pos) {
+  const strokes = drawingHistory[activeScreen] || [];
+  const r2      = (ERASER_WIDTH / 2) ** 2;
+  drawingHistory[activeScreen] = strokes.filter(s => {
+    return !s.points.some(p => (p.x - pos.x) ** 2 + (p.y - pos.y) ** 2 <= r2);
+  });
+  renderDrawings();
+}
+
+// Undo last stroke with Ctrl+Z
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    const strokes = drawingHistory[activeScreen];
+    if (strokes && strokes.length > 0) {
+      strokes.pop();
+      renderDrawings();
+      addLog('Undo stroke', 'info');
+    }
+  }
+  // Keyboard shortcuts
+  if (!e.ctrlKey && !e.metaKey && document.activeElement !== cmdInput) {
+    if (e.key === 's' || e.key === 'S') setActiveTool('select');
+    if (e.key === 'd' || e.key === 'D') setActiveTool('draw');
+    if (e.key === 'e' || e.key === 'E') setActiveTool('eraser');
+  }
+});
+
+// ── Tool switching ─────────────────────────────────────────────
+function setActiveTool(tool) {
+  activeTool = tool;
+  document.getElementById('tool-select').classList.toggle('active', tool === 'select');
+  document.getElementById('tool-draw').classList.toggle('active',   tool === 'draw');
+  document.getElementById('tool-eraser').classList.toggle('active', tool === 'eraser');
+
+  canvasArea.classList.toggle('drawing-mode', tool === 'draw');
+  canvasArea.classList.toggle('eraser-mode',  tool === 'eraser');
+
+  // Enable pointer events on drawing SVG only when a draw tool is active
+  drawingSvg.classList.toggle('interactive', tool === 'draw' || tool === 'eraser');
+
+  // Enable/disable dragging of elements
+  elemLayer.style.pointerEvents = (tool === 'draw' || tool === 'eraser') ? 'none' : '';
+
+  drawPanel.classList.toggle('visible', tool === 'draw' || tool === 'eraser');
+}
+
+// ── Toolbar dropdown toggle ────────────────────────────────────
+const toolbarToggle = document.getElementById('toolbar-toggle');
+const toolbarMenu   = document.getElementById('toolbar');
+
+toolbarToggle.onclick = (e) => {
+  e.stopPropagation();
+  const open = toolbarMenu.classList.toggle('open');
+  toolbarToggle.classList.toggle('open', open);
+};
+
+// Close when clicking anywhere outside the toolbar
+document.addEventListener('click', (e) => {
+  if (!toolbarMenu.contains(e.target) && e.target !== toolbarToggle) {
+    toolbarMenu.classList.remove('open');
+    toolbarToggle.classList.remove('open');
+  }
+});
+
+// Close toolbar after selecting a tool (keeps it tidy)
+function closeToolbar() {
+  toolbarMenu.classList.remove('open');
+  toolbarToggle.classList.remove('open');
+}
+
+document.getElementById('tool-select').onclick = () => { setActiveTool('select'); closeToolbar(); };
+document.getElementById('tool-draw').onclick   = () => { setActiveTool('draw'); };
+document.getElementById('tool-eraser').onclick = () => { setActiveTool('eraser'); };
+
+// ── Swatch and stroke width pickers ───────────────────────────
+document.querySelectorAll('.color-swatch').forEach(sw => {
+  sw.onclick = () => {
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+    drawColor = sw.dataset.color;
+  };
+});
+
+[['stroke-thin','thin'],['stroke-medium','medium'],['stroke-thick','thick']].forEach(([id, key]) => {
+  document.getElementById(id).onclick = () => {
+    document.querySelectorAll('.stroke-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    drawWidth = STROKE_WIDTHS[key];
+  };
+});
+
+// ── Clear: now clears BOTH elements AND drawings ──────────────
+document.getElementById('tool-clear').onclick = () => {
+  Object.values(chartInstances).forEach(c => c.destroy()); chartInstances = {};
+  screens[activeScreen] = [];
+  drawingHistory[activeScreen] = [];
+  renderElements();
+  addLog(`Cleared screen ${activeScreen}`, 'info');
+};
+
+// ── Edit popover ───────────────────────────────────────────────
+function openEditPopover(id, domEl) {
+  const data = screens[activeScreen].find(e => e.id === id);
+  if (!data || data.type === 'arrow') return;
+  editingId = id;
+  document.getElementById('edit-label').value = data.label || '';
+  document.getElementById('edit-color').value = data.color || 'purple';
+  const size = data.size || 'md';
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.toggle('active', b.dataset.size === size));
+  const rect     = domEl.getBoundingClientRect();
+  const areaRect = canvasArea.getBoundingClientRect();
+  let left = rect.right - areaRect.left + 10;
+  if (left + 250 > canvasArea.offsetWidth) left = rect.left - areaRect.left - 260;
+  editPopover.style.left    = left + 'px';
+  editPopover.style.top     = (rect.top - areaRect.top) + 'px';
+  editPopover.style.display = 'block';
+}
+
+document.getElementById('edit-close').onclick  = () => { editPopover.style.display = 'none'; editingId = null; };
+document.querySelectorAll('.size-btn').forEach(b => {
+  b.onclick = () => { document.querySelectorAll('.size-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); };
+});
+document.getElementById('edit-apply').onclick = () => {
+  if (!editingId) return;
+  const data = screens[activeScreen].find(e => e.id === editingId);
+  if (!data) return;
+  data.label = document.getElementById('edit-label').value;
+  data.color = document.getElementById('edit-color').value;
+  data.size  = document.querySelector('.size-btn.active')?.dataset.size || 'md';
+  delete data.w; delete data.h;
+  editPopover.style.display = 'none'; editingId = null;
+  renderElements();
+};
+canvasArea.addEventListener('click', e => {
+  if (!editPopover.contains(e.target)) { editPopover.style.display = 'none'; editingId = null; }
+});
+
+// ── Log ────────────────────────────────────────────────────────
+function addLog(msg, type = 'action') {
+  const d = document.createElement('div');
+  d.className = 'log-entry ' + type;
+  d.textContent = '> ' + msg;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ── Tool definitions ───────────────────────────────────────────
+const tools = [
+  {
+    name: "add_element",
+    description: "Add a box, circle, or sticky note to the whiteboard.",
+    input_schema: {
+      type: "object",
+      properties: {
+        type:   { type: "string", enum: ["box","circle","sticky"] },
+        label:  { type: "string" },
+        color:  { type: "string", enum: ["purple","pink","teal","amber","gray","red","green"] },
+        size:   { type: "string", enum: ["sm","md","lg","xl"] },
+        x:      { type: "number" },
+        y:      { type: "number" },
+        screen: { type: "number" }
+      },
+      required: ["type","label"]
+    }
+  },
+  {
+    name: "add_chart",
+    description: "Add a chart to the whiteboard. Always provide meaningful labels and values that fit the user's request.",
+    input_schema: {
+      type: "object",
+      properties: {
+        chartType:   { type: "string", enum: ["bar","line","pie","doughnut"] },
+        label:       { type: "string", description: "Chart title" },
+        chartLabels: { type: "array", items: { type: "string" }, description: "Category or x-axis labels" },
+        chartValues: { type: "array", items: { type: "number" }, description: "Data values, must match chartLabels length" },
+        size:        { type: "string", enum: ["sm","md","lg","xl"] },
+        x:           { type: "number" },
+        y:           { type: "number" },
+        screen:      { type: "number" }
+      },
+      required: ["chartType","label","chartLabels","chartValues"]
+    }
+  },
+  {
+    name: "update_element",
+    description: "Modify any property of an existing element — label, color, size, position, or chart data. Always prefer this over delete+recreate.",
+    input_schema: {
+      type: "object",
+      properties: {
+        label:             { type: "string",  description: "Current label of the element to find" },
+        new_label:         { type: "string",  description: "New label text" },
+        new_color:         { type: "string",  enum: ["purple","pink","teal","amber","gray","red","green"] },
+        new_size:          { type: "string",  enum: ["sm","md","lg","xl"] },
+        new_x:             { type: "number" },
+        new_y:             { type: "number" },
+        new_chart_type:    { type: "string",  enum: ["bar","line","pie","doughnut"] },
+        new_chart_labels:  { type: "array",   items: { type: "string" } },
+        new_chart_values:  { type: "array",   items: { type: "number" } }
+      },
+      required: ["label"]
+    }
+  },
+  {
+    name: "add_arrow",
+    description: "Draw a dashed arrow between two elements by their labels. Both elements must already exist.",
+    input_schema: {
+      type: "object",
+      properties: {
+        from_label: { type: "string" },
+        to_label:   { type: "string" },
+        label:      { type: "string" }
+      },
+      required: ["from_label","to_label"]
+    }
+  },
+  {
+    name: "delete_element",
+    description: "Remove an element and all connected arrows by its label.",
+    input_schema: {
+      type: "object",
+      properties: { label: { type: "string" } },
+      required: ["label"]
+    }
+  },
+  {
+    name: "switch_screen",
+    description: "Switch the active screen.",
+    input_schema: {
+      type: "object",
+      properties: { screen: { type: "number" } },
+      required: ["screen"]
+    }
+  },
+  {
+    name: "clear_screen",
+    description: "Remove all elements from a screen.",
+    input_schema: {
+      type: "object",
+      properties: { screen: { type: "number" } },
+      required: []
+    }
+  }
+];
+
+// ── Execute tool call ──────────────────────────────────────────
+function execTool(name, input) {
+  addLog(`${name}(${JSON.stringify(input)})`, 'action');
+
+  if (name === 'switch_screen') {
+    if (screens[input.screen]) { activeScreen = input.screen; renderTabs(); renderElements(); }
+    return { ok: true };
+  }
+
+  if (name === 'clear_screen') {
+    const sc = input.screen || activeScreen;
+    if (screens[sc]) { screens[sc] = []; if (sc === activeScreen) renderElements(); }
+    return { ok: true };
+  }
+
+  if (name === 'add_element') {
+    const sc       = input.screen || activeScreen;
+    if (!screens[sc]) screens[sc] = [];
+    const existing = screens[sc].filter(e => e.type !== 'arrow').length;
+    const el = {
+      id: nextId++, type: input.type || 'box', label: input.label,
+      color: input.color || 'purple', size: input.size || 'md',
+      x: input.x !== undefined ? input.x : 80 + (existing % 4) * 180,
+      y: input.y !== undefined ? input.y : 80 + Math.floor(existing / 4) * 130,
+    };
+    screens[sc].push(el);
+    if (sc === activeScreen) renderElements();
+    return { ok: true, id: el.id };
+  }
+
+  if (name === 'add_chart') {
+    const sc       = input.screen || activeScreen;
+    if (!screens[sc]) screens[sc] = [];
+    const existing = screens[sc].filter(e => e.type !== 'arrow').length;
+    const el = {
+      id: nextId++, type: 'chart', label: input.label,
+      chartType: input.chartType, chartLabels: input.chartLabels, chartValues: input.chartValues,
+      size: input.size || 'md',
+      x: input.x !== undefined ? input.x : 80 + (existing % 2) * 380,
+      y: input.y !== undefined ? input.y : 80 + Math.floor(existing / 2) * 270,
+    };
+    screens[sc].push(el);
+    if (sc === activeScreen) renderElements();
+    return { ok: true, id: el.id };
+  }
+
+  if (name === 'update_element') {
+    const el = screens[activeScreen].find(e =>
+      e.label && e.label.toLowerCase() === input.label.toLowerCase()
+    );
+    if (!el) return { ok: false, error: `Not found: "${input.label}"` };
+    if (input.new_label        !== undefined) el.label       = input.new_label;
+    if (input.new_color        !== undefined) el.color       = input.new_color;
+    if (input.new_size         !== undefined) { el.size      = input.new_size; delete el.w; delete el.h; }
+    if (input.new_x            !== undefined) el.x           = input.new_x;
+    if (input.new_y            !== undefined) el.y           = input.new_y;
+    if (input.new_chart_type   !== undefined) el.chartType   = input.new_chart_type;
+    if (input.new_chart_labels !== undefined) el.chartLabels = input.new_chart_labels;
+    if (input.new_chart_values !== undefined) el.chartValues = input.new_chart_values;
+    renderElements();
+    return { ok: true };
+  }
+
+  if (name === 'add_arrow') {
+    const els  = screens[activeScreen];
+    const from = els.find(e => e.label && e.label.toLowerCase() === input.from_label.toLowerCase());
+    const to   = els.find(e => e.label && e.label.toLowerCase() === input.to_label.toLowerCase());
+    if (!from || !to) return { ok: false, error: `Element not found` };
+    els.push({ id: nextId++, type: 'arrow', from: from.id, to: to.id, label: input.label || '' });
+    renderElements();
+    return { ok: true };
+  }
+
+  if (name === 'delete_element') {
+    const el = screens[activeScreen].find(e =>
+      e.label && e.label.toLowerCase() === input.label.toLowerCase()
+    );
+    if (!el) return { ok: false, error: `Not found: "${input.label}"` };
+    removeElement(el.id);
+    return { ok: true };
+  }
+
+  return { ok: false, error: 'Unknown tool: ' + name };
+}
+
+// ── Web search tool definition (passed to API alongside whiteboard tools) ──
+const webSearchTool = {
+  type: "web_search_20250305",
+  name: "web_search"
+};
+
+// ── AI call ────────────────────────────────────────────────────
+async function sendCommand(text) {
+  if (!API_KEY) { document.getElementById('api-key-bar').style.display = 'flex'; addLog('No API key set.', 'error'); return; }
+  if (API_KEY.length < 20) { addLog('API key looks too short — re-enter it.', 'error'); document.getElementById('api-key-bar').style.display = 'flex'; return; }
+
+  sendBtn.disabled = true;
+  statusEl.textContent = 'thinking…'; statusEl.className = 'thinking';
+
+  const snapshot = JSON.stringify(
+    Object.entries(screens).map(([id, els]) => ({
+      screen: parseInt(id),
+      elements: els.map(e => ({
+        id: e.id, type: e.type, label: e.label,
+        x: Math.round(e.x), y: Math.round(e.y),
+        color: e.color, size: e.size,
+        ...(e.type === 'chart' ? { chartType: e.chartType, chartLabels: e.chartLabels, chartValues: e.chartValues } : {}),
+        ...(e.type === 'arrow' ? { from: e.from, to: e.to } : {})
+      }))
+    }))
+  );
+
+  // Include finger position if tracking is active
+  const fingerContext = fingerPos
+    ? `\nFinger pointer: the user is currently pointing at canvas coordinate x=${fingerPos.x}, y=${fingerPos.y}. When they say "that", "this", "it", or "there", resolve it using this coordinate against the element positions above.`
+    : '';
+
+  const systemPrompt = `You are an AI controller for a multi-screen visual whiteboard with chart support and live internet access.
+
+Current whiteboard state:
+${snapshot}
+
+Active screen: ${activeScreen}
+Available screens: ${Object.keys(screens).join(', ')}
+Canvas size: ~900×500 px per screen
+
+Instructions:
+- You have web_search available. Use it whenever the user asks for real-world data — stock prices, statistics, news, sports scores, weather, company info, trends, etc.
+- After searching, extract the relevant numbers and use them as chartValues / chartLabels. Round to sensible precision.
+- To change anything about an existing element, ALWAYS use update_element — never delete and recreate.
+- For charts: bar, line, pie, doughnut are supported.
+- Spread elements across the canvas — avoid overlapping. Use the full width.
+- Color guide: purple=primary, teal=data/storage, amber=queues/warnings, pink=external, gray=neutral, red=errors, green=success.
+- Size guide: sm=compact, md=default, lg=prominent, xl=hero.
+- Finish with a brief one-sentence summary noting the data source if you searched the web.
+- If a finger coordinate is provided and the user says 'that/this/it/there', find the element whose center is closest to that coordinate.
+${fingerContext}`;
+
+  const messages = [{ role: 'user', content: text }];
+
+  try {
+    let keepGoing = true;
+    while (keepGoing) {
+      const resp = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          system: systemPrompt,
+          tools: [webSearchTool, ...tools],
+          messages
+        })
+      });
+
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error.message);
+
+      messages.push({ role: 'assistant', content: data.content });
+
+      // Separate web_search tool uses from whiteboard tool uses
+      const allToolUses = data.content.filter(b => b.type === 'tool_use');
+      const webSearchUses = allToolUses.filter(b => b.name === 'web_search');
+      const boardToolUses = allToolUses.filter(b => b.name !== 'web_search');
+
+      if (allToolUses.length === 0 || data.stop_reason === 'end_turn') {
+        keepGoing = false;
+        const tb = data.content.find(b => b.type === 'text');
+        if (tb) addLog(tb.text, 'info');
+      } else {
+        const toolResults = [];
+
+        // Web search results are returned directly by the API in the response
+        // when using the built-in web_search tool — they come back as web_search_result blocks.
+        // We still need to return a tool_result for each tool_use block.
+        for (const tu of webSearchUses) {
+          statusEl.textContent = '🔍 searching…';
+          addLog(`web_search("${tu.input.query}")`, 'info');
+          // The built-in web_search tool is server-side; its results are injected
+          // automatically into the next assistant turn by Anthropic's API.
+          // We return an ack so the loop continues correctly.
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: tu.id,
+            content: 'Search completed.'
+          });
+        }
+
+        // Execute whiteboard tool calls
+        for (const tu of boardToolUses) {
+          statusEl.textContent = 'updating…';
+          const result = execTool(tu.name, tu.input);
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: tu.id,
+            content: JSON.stringify(result)
+          });
+        }
+
+        if (toolResults.length > 0) {
+          messages.push({ role: 'user', content: toolResults });
+        }
+
+        if (data.stop_reason === 'end_turn') keepGoing = false;
+      }
+    }
+    statusEl.textContent = 'ready'; statusEl.className = '';
+  } catch (err) {
+    statusEl.textContent = 'error'; statusEl.className = 'error';
+    addLog(err.message, 'error'); console.error(err);
+  }
+  sendBtn.disabled = false;
+}
+
+// ── Silence timer (auto-send) ─────────────────────────────────
+// Replaces "send it" for hands-free use.
+// Resets every time new final words arrive.
+// When silence exceeds the threshold, checks sentence completeness then sends.
+
+let silenceTimer     = null;
+let silenceDelay     = 1800;  // ms — default 1.8s, adjustable via slider
+let silenceEnabled   = true;
+
+// Words that suggest the sentence isn't finished yet
+const INCOMPLETE_ENDINGS = [
+  'a','an','the','of','and','or','but','to','in','on','at','for',
+  'with','from','by','as','is','are','was','were','be','been',
+  'will','would','could','should','can','may','might','shall',
+  'that','which','who','where','when','how','what','please',
+  'go','i','you','we','they','it','this','these','those'
+];
+
+function isLikelyComplete(text) {
+  if (!text || text.trim().length < 3) return false;
+  const words = text.trim().toLowerCase().split(/\s+/);
+  const lastWord = words[words.length - 1].replace(/[^a-z]/g, '');
+  // If last word is a connector/article/preposition, probably not done
+  return !INCOMPLETE_ENDINGS.includes(lastWord);
+}
+
+function scheduleSilenceCheck() {
+  clearTimeout(silenceTimer);
+  if (!silenceEnabled || voiceState !== 'active') return;
+  silenceTimer = setTimeout(() => {
+    const cmd = commandBuffer.trim();
+    if (!cmd) return;
+    if (isLikelyComplete(cmd)) {
+      // Looks like a complete thought — send it
+      doAutoSend(cmd);
+    } else {
+      // Might be incomplete — wait one more second then send anyway
+      silenceTimer = setTimeout(() => {
+        const cmd2 = commandBuffer.trim();
+        if (cmd2) doAutoSend(cmd2);
+      }, 1000);
+    }
+  }, silenceDelay);
+}
+
+function doAutoSend(cmd) {
+  commandBuffer = '';
+  sessionBuffer = '';
+  cmdInput.value = '';
+  setVoiceState('waiting');
+  setFaceIndicatorSoftActive(false);
+  try { recognition.stop(); } catch(e) {}
+  addLog(cmd, 'info');
+  sendCommand(cmd);
+}
+
+// Silence panel toggle
+const silencePanel = document.getElementById('silence-panel');
+document.getElementById('tool-silence').onclick = () => {
+  silencePanel.classList.toggle('active');
+  offsetPanel.classList.remove('active'); // close offset panel if open
+};
+
+// Slider
+const silenceSlider = document.getElementById('silence-slider');
+const silenceVal    = document.getElementById('silence-val');
+silenceSlider.addEventListener('input', () => {
+  silenceDelay = Math.round(parseFloat(silenceSlider.value) * 1000);
+  silenceVal.textContent = parseFloat(silenceSlider.value).toFixed(1) + 's';
+});
+
+// Enable/disable checkbox
+document.getElementById('silence-enabled').addEventListener('change', e => {
+  silenceEnabled = e.target.checked;
+  addLog('Auto-send ' + (silenceEnabled ? 'enabled' : 'disabled — use "send it"'), 'info');
+});
+
+// ── Always-on face detection ──────────────────────────────────
+// Runs MediaPipe FaceMesh in background from page load.
+// Sets isFacingCamera = true when user is glancing toward camera (medium sensitivity).
+// Medium sensitivity = nose tip within ~35 degrees of camera center.
+
+let isFacingCamera  = false;
+let mpFaceMesh      = null;
+let faceCamera      = null;
+let faceDetectReady = false;
+
+const faceVideo     = document.getElementById('face-video');
+const faceIndicator = document.getElementById('face-indicator');
+const faceLabel     = document.getElementById('face-label');
+
+// Nose tip = landmark 1, left eye outer = 33, right eye outer = 263
+// We estimate yaw by comparing nose tip x to midpoint of eyes.
+// |offset| < threshold = facing camera.
+const FACE_YAW_THRESHOLD = 0.10; // normalized units (~35 deg, medium sensitivity)
+
+function initFaceDetection() {
+  if (typeof FaceMesh === 'undefined') {
+    // FaceMesh not loaded yet — retry in 1s
+    setTimeout(initFaceDetection, 1000); return;
+  }
+
+  mpFaceMesh = new FaceMesh({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
+  mpFaceMesh.setOptions({
+    maxNumFaces: 1,
+    refineLandmarks: false,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence:  0.5,
+  });
+  mpFaceMesh.onResults(onFaceResults);
+
+  navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: 'user' } })
+    .then(stream => {
+      faceVideo.srcObject = stream;
+      faceVideo.play();
+      faceDetectReady = true;
+      // Run face detection loop
+      requestAnimationFrame(faceDetectLoop);
+    })
+    .catch(err => {
+      console.warn('Face detection camera error:', err.message);
+    });
+}
+
+async function faceDetectLoop() {
+  if (!faceDetectReady || !mpFaceMesh) return;
+  if (faceVideo.readyState >= 2) {
+    await mpFaceMesh.send({ image: faceVideo });
+  }
+  setTimeout(faceDetectLoop, 80); // ~12fps is enough for face detection
+}
+
+function onFaceResults(results) {
+  if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+    const lm = results.multiFaceLandmarks[0];
+
+    // Estimate yaw: compare nose tip x to midpoint between eye outer corners
+    const noseTip   = lm[1];
+    const leftEye   = lm[33];
+    const rightEye  = lm[263];
+    const eyeMidX   = (leftEye.x + rightEye.x) / 2;
+    const yawOffset = Math.abs(noseTip.x - eyeMidX);
+
+    const facingNow = yawOffset < FACE_YAW_THRESHOLD;
+
+    if (facingNow !== isFacingCamera) {
+      isFacingCamera = facingNow;
+      updateFaceIndicator();
+    }
+  } else {
+    if (isFacingCamera) {
+      isFacingCamera = false;
+      updateFaceIndicator();
+    }
+  }
+}
+
+function updateFaceIndicator() {
+  faceIndicator.classList.remove('detected', 'soft-active');
+  if (isFacingCamera) {
+    faceIndicator.classList.add('detected');
+    faceLabel.textContent = 'face on';
+  } else {
+    faceLabel.textContent = 'no face';
+  }
+}
+
+function setFaceIndicatorSoftActive(active) {
+  faceIndicator.classList.toggle('soft-active', active);
+  if (active) faceLabel.textContent = 'listening…';
+  else updateFaceIndicator();
+}
+
+// Start face detection after a short delay so page renders first
+setTimeout(initFaceDetection, 1500);
+
+// ── Wake word + voice recognition ─────────────────────────────
+// States: 'off' | 'waiting' (always-on, listening for wake word) | 'active' (capturing command)
+const micBtn  = document.getElementById('mic-btn');
+const micTip  = document.getElementById('mic-tip');
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+const WAKE_WORD     = 'hey wall';           // what to listen for
+const WAKE_VARIANTS = ['hey wall', 'hey waul', 'hey wahl', 'a wall', 'hey whall']; // common mishears
+const SLEEP_VARIANTS = ['send it', 'send it.', 'senate', 'send-it', 'sendit'];
+// Soft wake phrases — only fire when isFacingCamera is true
+const SOFT_WAKE_VARIANTS = [
+  'will you', 'can you', 'could you', 'please',
+  'go ahead and', 'i want you to',
+  'and then can you'
+]; // sleep word — "senate" catches a common mishear
+const PLACEHOLDER_WAITING = `Say "Hey Wall …your command… Send it" or type here`;
+const PLACEHOLDER_ACTIVE  = `🎤 Listening… say "Send it" to send`;
+const PLACEHOLDER_DEFAULT = 'Say or type: "add a bar chart of monthly revenue" · "change Frontend to teal"';
+
+let voiceState   = 'off';   // off | waiting | active
+let recognition  = null;
+let restartTimer = null;
+let commandBuffer = '';     // accumulates words after wake word
+let sessionBuffer = '';     // rolling buffer of NEW words only this recognition session
+
+function setVoiceState(state) {
+  voiceState = state;
+  micBtn.classList.remove('listening', 'waiting');
+  if (state === 'waiting') {
+    micBtn.classList.add('waiting');
+    micBtn.title        = 'Always listening — say "Hey Wall" to activate. Click to turn off.';
+    micBtn.textContent  = '🎤';
+    cmdInput.placeholder = PLACEHOLDER_WAITING;
+    statusEl.textContent = '👂 waiting for "hey wall"…';
+    statusEl.className   = '';
+  } else if (state === 'active') {
+    micBtn.classList.add('listening');
+    micBtn.title        = 'Listening for your command…';
+    cmdInput.placeholder = PLACEHOLDER_ACTIVE;
+    statusEl.textContent = '🎤 listening…';
+    statusEl.className   = 'thinking';
+  } else {
+    micBtn.title        = 'Click to enable wake word ("Hey Board")';
+    micBtn.textContent  = '🎤';
+    cmdInput.placeholder = PLACEHOLDER_DEFAULT;
+    statusEl.textContent = 'ready';
+    statusEl.className   = '';
+  }
+}
+
+if (!SpeechRecognition) {
+  micBtn.disabled     = true;
+  micTip.textContent  = 'Voice not supported — use Chrome or Edge';
+  micTip.style.display = 'none';
+  document.getElementById('mic-wrap').addEventListener('mouseenter', () => { micTip.style.display = 'block'; });
+  document.getElementById('mic-wrap').addEventListener('mouseleave', () => { micTip.style.display = 'none'; });
+} else {
+  function buildRecognition() {
+    const r = new SpeechRecognition();
+    r.continuous     = true;   // keep mic open
+    r.interimResults = true;
+    r.lang           = 'en-US';
+
+    r.onresult = (e) => {
+      // Only process NEW results using e.resultIndex.
+      // FINAL results are appended to sessionBuffer (these are stable, won't change).
+      // INTERIM results are only used for the live display — never for detection.
+      // This prevents the word-doubling that happens when interim chunks keep updating.
+      let newFinals = '';
+      let latestInterim = '';
+
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript.toLowerCase().trim();
+        if (e.results[i].isFinal) {
+          newFinals += ' ' + t;
+        } else {
+          latestInterim = t; // only keep the most recent interim — don't accumulate
+        }
+      }
+
+      // Append only finalised words to the stable buffer
+      if (newFinals.trim()) {
+        sessionBuffer = (sessionBuffer + ' ' + newFinals.trim()).trim();
+      }
+
+      // What to check for wake/sleep detection — stable words only
+      const checkText = sessionBuffer;
+      // What to show in the input field — stable + current in-progress word
+      const displayText = latestInterim
+        ? (sessionBuffer + ' ' + latestInterim).trim()
+        : sessionBuffer;
+
+      if (voiceState === 'waiting') {
+        // Check hard wake word first (always works)
+        const hardTriggered = WAKE_VARIANTS.some(v => checkText.includes(v));
+        // Check soft wake phrases (only when facing camera)
+        const softTriggered = isFacingCamera && SOFT_WAKE_VARIANTS.some(v => checkText.includes(v));
+        const triggered     = hardTriggered || softTriggered;
+        const triggerLabel  = hardTriggered ? '"Hey Wall"' : 'soft phrase (face detected)';
+
+        if (triggered) {
+          // Find which variant matched and where
+          const allVariants = hardTriggered ? WAKE_VARIANTS : SOFT_WAKE_VARIANTS;
+          let after = checkText;
+          for (const v of allVariants) {
+            const idx = after.lastIndexOf(v);
+            if (idx !== -1) { after = after.slice(idx + v.length).trim(); break; }
+          }
+          commandBuffer = after;
+          sessionBuffer = after;
+          setVoiceState('active');
+          setFaceIndicatorSoftActive(true);
+          cmdInput.value = commandBuffer;
+          addLog('Wake detected via ' + triggerLabel, 'info');
+          // Start silence timer in case wake word + command came in one breath
+          if (after.trim()) scheduleSilenceCheck();
+        }
+      } else if (voiceState === 'active') {
+        const slept = SLEEP_VARIANTS.some(s => checkText.includes(s));
+        if (slept) {
+          let cmd = checkText;
+          for (const s of SLEEP_VARIANTS) {
+            const si = cmd.indexOf(s);
+            if (si !== -1) { cmd = cmd.slice(0, si); break; }
+          }
+          cmd = cmd.trim();
+          addLog('Sleep word detected — "Send it"', 'info');
+          const toSend = cmd;
+          clearTimeout(silenceTimer); // cancel auto-send — user said "send it" explicitly
+          commandBuffer = '';
+          sessionBuffer = '';
+          cmdInput.value = '';
+          setVoiceState('waiting');
+          setFaceIndicatorSoftActive(false);
+          try { recognition.stop(); } catch(err) {}
+          if (toSend) {
+            setTimeout(() => { addLog(toSend, 'info'); sendCommand(toSend); }, 100);
+          }
+        } else {
+          // Still capturing — show stable + in-progress in input field
+          commandBuffer = sessionBuffer;
+          cmdInput.value = displayText;
+          // Every time NEW final words land, reset the silence countdown
+          if (newFinals.trim()) scheduleSilenceCheck();
+        }
+      }
+    };
+
+    r.onerror = (e) => {
+      if (e.error === 'not-allowed') {
+        addLog('Microphone permission denied.', 'error');
+        setVoiceState('off');
+      } else if (e.error === 'no-speech') {
+        // Expected — just restart quietly if still in waiting/active state
+      } else {
+        addLog('Speech error: ' + e.error, 'error');
+      }
+    };
+
+    r.onend = () => {
+      // When recognition ends naturally (brief gap / browser pause),
+      // restart it so we keep listening. The silence timer handles actual sending.
+      if (voiceState === 'waiting' || voiceState === 'active') {
+        clearTimeout(restartTimer);
+        restartTimer = setTimeout(() => {
+          sessionBuffer = '';
+          try { recognition.start(); } catch(e) { /* already running */ }
+        }, 200);
+      }
+    };
+
+    return r;
+  }
+
+  recognition = buildRecognition();
+
+  // Mic button toggles always-on mode on/off
+  micBtn.onclick = () => {
+    if (voiceState === 'off') {
+      commandBuffer = '';
+      recognition = buildRecognition();
+      try {
+        recognition.start();
+        setVoiceState('waiting');
+        addLog(`Wake word active — say "Hey Wall …command… Send it"`, 'info');
+      } catch(e) {
+        addLog('Could not start mic: ' + e.message, 'error');
+      }
+    } else {
+      // Turn off
+      clearTimeout(restartTimer);
+      try { recognition.stop(); } catch(e) {}
+      clearTimeout(silenceTimer);
+      commandBuffer = '';
+      sessionBuffer = '';
+      cmdInput.value = '';
+      setVoiceState('off');
+      addLog('Wake word deactivated', 'info');
+    }
+  };
+}
+
+
+// ── Presence (MediaPipe Hands) ─────────────────────────
+const camPreview  = document.getElementById('camera-preview');
+const camVideo    = document.getElementById('cam-video');
+const camCanvas   = document.getElementById('cam-canvas');
+const camStatus   = document.getElementById('cam-status');
+const fingerDot   = document.getElementById('finger-dot');
+const toolCamera  = document.getElementById('tool-camera');
+
+let handTracking  = false;
+let mpHands       = null;
+let mpCamera      = null;
+let fingerPos     = null; // current {x, y} in canvas-area pixels, or null
+
+toolCamera.onclick = () => {
+  if (!handTracking) {
+    startFingerTracking();
+  } else {
+    stopFingerTracking();
+  }
+};
+
+function startFingerTracking() {
+  // Check browser support
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    addLog('Camera not supported in this browser.', 'error'); return;
+  }
+  if (typeof Hands === 'undefined') {
+    addLog('MediaPipe not loaded yet — try again in a moment.', 'error'); return;
+  }
+
+  handTracking = true;
+  toolCamera.classList.add('active');
+  camPreview.classList.add('active');
+  addLog('Starting Presence…', 'info');
+
+  // Init MediaPipe Hands
+  mpHands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  mpHands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 0,      // 0 = lite (fast), 1 = full (accurate)
+    minDetectionConfidence: 0.7,
+    minTrackingConfidence:  0.6,
+  });
+
+  mpHands.onResults(onHandResults);
+
+  // Start camera feed
+  mpCamera = new Camera(camVideo, {
+    onFrame: async () => { await mpHands.send({ image: camVideo }); },
+    width: 320, height: 240,
+    facingMode: 'user',
+  });
+
+  mpCamera.start().then(() => {
+    addLog('Presence active — face detection on, use ⊹ to adjust finger dot offset', 'info');
+  }).catch(err => {
+    addLog('Camera error: ' + err.message, 'error');
+    stopFingerTracking();
+  });
+}
+
+function stopFingerTracking() {
+  handTracking = false;
+  toolCamera.classList.remove('active');
+  camPreview.classList.remove('active');
+  fingerDot.classList.remove('visible');
+  fingerPos = null;
+  offsetPanel.classList.remove('active');
+  if (mpCamera) { try { mpCamera.stop(); } catch(e) {} mpCamera = null; }
+  if (mpHands)  { try { mpHands.close(); } catch(e) {} mpHands = null; }
+  addLog('Presence stopped', 'info');
+}
+
+// ── Offset state ──────────────────────────────────────────────
+let offsetX = 0;
+let offsetY = 0;
+let flipX   = false; // toggle camera X axis
+
+const offsetPanel = document.getElementById('offset-panel');
+const sliderX     = document.getElementById('offset-x');
+const sliderY     = document.getElementById('offset-y');
+const valX        = document.getElementById('offset-x-val');
+const valY        = document.getElementById('offset-y-val');
+
+sliderX.addEventListener('input', () => {
+  offsetX = parseInt(sliderX.value);
+  valX.textContent = offsetX > 0 ? '+' + offsetX : offsetX;
+});
+sliderY.addEventListener('input', () => {
+  offsetY = parseInt(sliderY.value);
+  valY.textContent = offsetY > 0 ? '+' + offsetY : offsetY;
+});
+document.getElementById('offset-reset').onclick = () => {
+  offsetX = 0; offsetY = 0;
+  sliderX.value = 0; sliderY.value = 0;
+  valX.textContent = '0'; valY.textContent = '0';
+};
+
+document.getElementById('flip-x-btn').onclick = () => {
+  flipX = !flipX;
+  const btn = document.getElementById('flip-x-btn');
+  btn.textContent  = flipX ? 'Flip X ✓' : 'Flip X';
+  btn.style.borderColor = flipX ? 'var(--accent)' : '';
+  btn.style.color       = flipX ? 'var(--accent)' : '';
+};
+
+// ⊹ button toggles the offset panel open/closed
+document.getElementById('calib-recalibrate').onclick = (e) => {
+  e.stopPropagation();
+  offsetPanel.classList.toggle('active');
+};
+
+// ── Draw hand skeleton on the preview canvas ───────────────────
+function drawHandOnPreview(landmarks) {
+  const ctx = camCanvas.getContext('2d');
+  camCanvas.width  = camVideo.videoWidth  || 320;
+  camCanvas.height = camVideo.videoHeight || 240;
+  ctx.clearRect(0, 0, camCanvas.width, camCanvas.height);
+
+  // Bone connections
+  ctx.strokeStyle = 'rgba(91,77,224,0.45)'; ctx.lineWidth = 1.5;
+  [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+   [5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],
+   [13,17],[17,18],[18,19],[19,20],[0,17]].forEach(([a,b]) => {
+    const la = landmarks[a], lb = landmarks[b];
+    ctx.beginPath();
+    ctx.moveTo(la.x*camCanvas.width, la.y*camCanvas.height);
+    ctx.lineTo(lb.x*camCanvas.width, lb.y*camCanvas.height);
+    ctx.stroke();
+  });
+
+  // Joint dots
+  ctx.fillStyle = 'rgba(91,77,224,0.55)';
+  landmarks.forEach(lm => {
+    ctx.beginPath();
+    ctx.arc(lm.x*camCanvas.width, lm.y*camCanvas.height, 3, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // Index fingertip highlight
+  const tip = landmarks[8];
+  const tx = tip.x*camCanvas.width, ty = tip.y*camCanvas.height;
+  ctx.fillStyle = '#5b4de0';
+  ctx.beginPath(); ctx.arc(tx, ty, 6, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(tx, ty, 3, 0, Math.PI*2); ctx.fill();
+}
+
+// ── Main hand results handler ──────────────────────────────────
+function onHandResults(results) {
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const landmarks = results.multiHandLandmarks[0];
+    drawHandOnPreview(landmarks);
+
+    const tip    = landmarks[8];
+    const areaRect = canvasArea.getBoundingClientRect();
+
+    // Linear mapping from normalized camera coords to board pixels,
+    // then apply the user's manual offset to line it up
+    const boardX = (flipX ? (1 - tip.x) : tip.x) * areaRect.width + offsetX;
+    const boardY = tip.y        * areaRect.height + offsetY;
+
+    fingerPos = { x: Math.round(boardX), y: Math.round(boardY) };
+
+    fingerDot.style.left = boardX + 'px';
+    fingerDot.style.top  = boardY + 'px';
+    fingerDot.classList.add('visible');
+    camStatus.classList.add('tracking');
+
+  } else {
+    // No hand in frame — clear the canvas and hide dot
+    const ctx = camCanvas.getContext('2d');
+    camCanvas.width  = camVideo.videoWidth  || 320;
+    camCanvas.height = camVideo.videoHeight || 240;
+    ctx.clearRect(0, 0, camCanvas.width, camCanvas.height);
+    fingerDot.classList.remove('visible');
+    camStatus.classList.remove('tracking');
+    fingerPos = null;
+  }
+}
+
+
+// ── Fullscreen ────────────────────────────────────────────────
+const fsBtn = document.getElementById('tool-fullscreen');
+
+function enterFullscreen() {
+  const el = document.documentElement; // fullscreen the whole page
+  if (el.requestFullscreen)            el.requestFullscreen();
+  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+}
+
+function exitFullscreen() {
+  if (document.exitFullscreen)            document.exitFullscreen();
+  else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+}
+
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function updateFsBtn() {
+  fsBtn.textContent = isFullscreen() ? '⛶' : '⛶';
+  fsBtn.title       = isFullscreen() ? 'Exit fullscreen (F)' : 'Fullscreen (F)';
+  fsBtn.classList.toggle('active', isFullscreen());
+}
+
+fsBtn.onclick = () => {
+  isFullscreen() ? exitFullscreen() : enterFullscreen();
+};
+
+// Keyboard shortcut — F key (when not typing in the input)
+document.addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') {
+    if (document.activeElement !== cmdInput) {
+      isFullscreen() ? exitFullscreen() : enterFullscreen();
+    }
+  }
+});
+
+// Update button state whenever fullscreen changes
+document.addEventListener('fullscreenchange',       updateFsBtn);
+document.addEventListener('webkitfullscreenchange', updateFsBtn);
+
+// ── Input ──────────────────────────────────────────────────────
+sendBtn.onclick = () => {
+  const v = cmdInput.value.trim();
+  if (!v) return;
+  addLog(v, 'info'); cmdInput.value = '';
+  sendCommand(v);
+};
+cmdInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendBtn.click(); });
+
+// ── Supabase collaboration ────────────────────────────────────
+const syncStatusEl = document.getElementById('sync-status');
+const boardIdInput = document.getElementById('board-id-input');
+const boardJoinBtn = document.getElementById('board-join-btn');
+
+// Unique ID for this browser tab — used to ignore our own realtime echoes
+const CLIENT_ID = Math.random().toString(36).slice(2, 10);
+let lastSaveTime = 0; // timestamp of our last save — ignore echoes within 3s
+
+function setSyncStatus(msg, color) {
+  syncStatusEl.textContent = msg;
+  syncStatusEl.style.color = color || 'var(--muted)';
+}
+
+// Generate a short random board ID
+function generateBoardId() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+// Save current state to Supabase
+async function saveToSupabase() {
+  if (!sbClient || !boardId || isSyncing) return;
+  lastSaveTime = Date.now(); // record when WE saved
+  const state = {
+    id:         boardId,
+    screens:    screens,
+    drawings:   drawingHistory,
+    client_id:  CLIENT_ID,  // tag so we can identify our own saves
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sbClient.from('boards').upsert(state);
+  if (error) {
+    console.warn('Supabase save error:', error.message);
+    setSyncStatus('save error', 'var(--accent2)');
+  } else {
+    setSyncStatus('synced ✓', '#44cc77');
+    setTimeout(() => setSyncStatus('connected', '#44cc77'), 1500);
+  }
+}
+
+// Load state from Supabase and apply it
+async function loadFromSupabase(id) {
+  if (!sbClient) return false;
+  const { data, error } = await sbClient.from('boards').select('*').eq('id', id).single();
+  if (error || !data) return false;
+  isSyncing = true;
+  screens       = data.screens  || { 1: [], 2: [] };
+  drawingHistory = data.drawings || {};
+  // Make sure active screen exists
+  if (!screens[activeScreen]) activeScreen = parseInt(Object.keys(screens)[0]) || 1;
+  // Recalculate nextId to avoid ID collisions
+  let maxId = 0;
+  Object.values(screens).forEach(els => els.forEach(e => { if (e.id > maxId) maxId = e.id; }));
+  nextId = maxId + 1;
+  renderTabs();
+  renderElements();
+  isSyncing = false;
+  return true;
+}
+
+// Subscribe to realtime changes
+function subscribeToBoard(id) {
+  if (!sbClient) return;
+  if (realtimeChannel) { sbClient.removeChannel(realtimeChannel); realtimeChannel = null; }
+
+  realtimeChannel = sbClient.channel('board-' + id)
+    .on('postgres_changes', {
+      event:  '*',
+      schema: 'public',
+      table:  'boards',
+      filter: `id=eq.${id}`
+    }, (payload) => {
+      if (isSyncing) return;
+      const data = payload.new;
+      if (!data) return;
+
+      // Ignore our own echoes — if this save came from us (same CLIENT_ID)
+      // or arrived within 3 seconds of our last save, skip it
+      if (data.client_id === CLIENT_ID) return;
+      if (Date.now() - lastSaveTime < 3000) return;
+
+      // This is a genuine change from another client — apply it
+      isSyncing = true;
+      screens        = data.screens  || screens;
+      drawingHistory = data.drawings || drawingHistory;
+      if (!screens[activeScreen]) activeScreen = parseInt(Object.keys(screens)[0]) || 1;
+      let maxId = 0;
+      Object.values(screens).forEach(els => els.forEach(e => { if (e.id > maxId) maxId = e.id; }));
+      nextId = maxId + 1;
+      renderTabs();
+      renderElements();
+      isSyncing = false;
+      setSyncStatus('updated ↓', '#5b4de0');
+      setTimeout(() => setSyncStatus('connected', '#44cc77'), 1000);
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        setSyncStatus('connected', '#44cc77');
+        addLog(`Connected to board "${id}" — share this ID to collaborate`, 'info');
+      }
+    });
+}
+
+// Join or create a board session
+async function joinBoard(id) {
+  if (!sbClient && !initSupabase()) {
+    setSyncStatus('offline — no sync', '#e8335a');
+    addLog('Supabase not ready yet — try again in a moment', 'error');
+    return;
+  }
+  boardId = id.trim().toUpperCase();
+  boardIdInput.value = boardId;
+  setSyncStatus('connecting…', 'var(--accent)');
+
+  const existed = await loadFromSupabase(boardId);
+  if (existed) {
+    addLog(`Loaded board "${boardId}"`, 'info');
+  } else {
+    // New board — save current state
+    await saveToSupabase();
+    addLog(`Created new board "${boardId}"`, 'info');
+  }
+  subscribeToBoard(boardId);
+}
+
+// Join button
+boardJoinBtn.onclick = () => {
+  const id = boardIdInput.value.trim();
+  if (!id) return;
+  joinBoard(id);
+};
+boardIdInput.addEventListener('keydown', e => { if (e.key === 'Enter') boardJoinBtn.click(); });
+
+// Auto-save whenever state changes — debounced so it doesn't fire on every pixel drag
+let saveTimer = null;
+function scheduleSave() {
+  if (!boardId) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToSupabase, 600);
+}
+
+// Hook scheduleSave into renderElements so every change auto-saves
+const _origRenderElements = renderElements;
+renderElements = function() {
+  _origRenderElements();
+  scheduleSave();
+};
+
+// Auto-create and join a board on load so you always have a session
+// Wait for Supabase library to load first (up to 5 retries)
+function tryAutoJoin(attempts) {
+  if (initSupabase()) {
+    const autoId = generateBoardId();
+    boardIdInput.value = autoId;
+    joinBoard(autoId);
+  } else if (attempts > 0) {
+    setTimeout(() => tryAutoJoin(attempts - 1), 800);
+  } else {
+    setSyncStatus('offline (no sync)', '#e8335a');
+    addLog('Supabase library failed to load — collaboration unavailable, but whiteboard still works', 'error');
+  }
+}
+setTimeout(() => tryAutoJoin(5), 1000);
+
+// ── Init ───────────────────────────────────────────────────────
+renderTabs();
+renderElements();
+addLog('Ready. Enter your Anthropic API key above to start.', 'info');
+addLog('Click 🎤 to activate wake word — say "Hey Wall …command… Send it"', 'info');
+</script>
+</body>
+</html>
