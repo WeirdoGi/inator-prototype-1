@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Whiteboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f11;
+      --surface: #1a1a1f;
+      --surface2: #222228;
+      --border: #2e2e38;
+      --accent: #7c6af7;
+      --accent2: #f76a8a;
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --canvas-bg: #13131a;
+      --font-ui: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #app {
+      display: grid;
+      grid-template-rows: 48px 1fr 80px;
+      height: 100vh;
+    }
+
+    /* ── Header ── */
+    #header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    #header .logo {
+      color: var(--accent);
+      font-size: 14px;
+      letter-spacing: 0.12em;
+    }
+    #screen-tabs {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+    }
+    .tab {
+      padding: 4px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      border: 1px solid transparent;
+      transition: all 0.15s;
+      font-family: var(--font-mono);
+      background: none;
+    }
+    .tab:hover { color: var(--text); background: var(--surface2); }
+    .tab.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(124, 106, 247, 0.1);
+    }
+    #add-screen {
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--muted);
+      border: 1px dashed var(--border);
+      background: none;
+      font-family: var(--font-mono);
+      transition: all 0.15s;
+    }
+    #add-screen:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Canvas area ── */
+    #canvas-area {
+      position: relative;
+      overflow: hidden;
+      background: var(--canvas-bg);
+    }
+    canvas {
+      position: absolute;
+      top: 0; left: 0;
+    }
+    #grid-canvas { opacity: 0.4; }
+
+    /* ── Whiteboard elements ── */
+    .wb-element {
+      position: absolute;
+      cursor: move;
+      user-select: none;
+      transition: box-shadow 0.15s;
+    }
+    .wb-element:hover { z-index: 10; }
+    .wb-element.selected {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      z-index: 20;
+    }
+
+    .wb-sticky {
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      min-width: 140px;
+      max-width: 240px;
+      word-break: break-word;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .wb-box {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1.5px solid;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 100px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .wb-circle {
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-align: center;
+      width: 90px;
+      height: 90px;
+      border: 1.5px solid;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Color themes */
+    .color-purple {
+      background: rgba(124, 106, 247, 0.18);
+      border-color: rgba(124, 106, 247, 0.6);
+      color: #c4baff;
+    }
+    .color-pink {
+      background: rgba(247, 106, 138, 0.18);
+      border-color: rgba(247, 106, 138, 0.6);
+      color: #ffbacb;
+    }
+    .color-teal {
+      background: rgba(80, 200, 180, 0.18);
+      border-color: rgba(80, 200, 180, 0.6);
+      color: #9aeedd;
+    }
+    .color-amber {
+      background: rgba(240, 180, 60, 0.18);
+      border-color: rgba(240, 180, 60, 0.6);
+      color: #ffd985;
+    }
+    .color-gray {
+      background: rgba(80, 80, 100, 0.28);
+      border-color: rgba(120, 120, 150, 0.5);
+      color: #c0c0d0;
+    }
+
+    /* Delete button on hover */
+    .delete-btn {
+      position: absolute;
+      top: -8px; right: -8px;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--accent2);
+      color: white;
+      border: none;
+      font-size: 10px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      z-index: 30;
+    }
+    .wb-element:hover .delete-btn,
+    .wb-element.selected .delete-btn { display: flex; }
+
+    /* ── Input bar ── */
+    #input-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+    #cmd-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #cmd-input:focus { border-color: var(--accent); }
+    #cmd-input::placeholder { color: var(--muted); }
+    #send-btn {
+      padding: 10px 20px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.04em;
+    }
+    #send-btn:hover { background: #9080ff; transform: translateY(-1px); }
+    #send-btn:disabled {
+      background: var(--muted);
+      transform: none;
+      cursor: not-allowed;
+    }
+    #status {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 120px;
+      text-align: right;
+    }
+    #status.thinking { color: var(--accent); }
+    #status.error { color: var(--accent2); }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      position: absolute;
+      top: 16px; left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      z-index: 50;
+    }
+    .tool-btn {
+      width: 32px; height: 32px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.12s;
+    }
+    .tool-btn:hover { background: var(--surface2); color: var(--text); }
+    .tool-btn.active { background: rgba(124, 106, 247, 0.2); color: var(--accent); }
+
+    /* ── SVG arrows ── */
+    #arrows-svg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* ── Log panel ── */
+    #log {
+      position: absolute;
+      bottom: 8px; right: 12px;
+      width: 280px;
+      max-height: 160px;
+      overflow-y: auto;
+      background: rgba(15, 15, 17, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      z-index: 100;
+    }
+    .log-entry { margin-bottom: 3px; line-height: 1.4; }
+    .log-entry.action { color: #7c6af7; }
+    .log-entry.error { color: var(--accent2); }
+    .log-entry.info { color: #50c8b4; }
+
+    /* ── API key prompt ── */
+    #api-key-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      background: rgba(247, 106, 138, 0.12);
+      border-bottom: 1px solid rgba(247, 106, 138, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #ffbacb;
+      z-index: 200;
+    }
+    #api-key-bar input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid rgba(247, 106, 138, 0.4);
+      border-radius: 6px;
+      padding: 5px 10px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      outline: none;
+    }
+    #api-key-bar button {
+      padding: 5px 14px;
+      background: var(--accent2);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div id="header">
+    <span class="logo">◈ BOARD</span>
+    <div id="screen-tabs"></div>
+    <button id="add-screen">+ screen</button>
+  </div>
+
+  <div id="canvas-area">
+    <canvas id="grid-canvas"></canvas>
+    <svg id="arrows-svg"></svg>
+    <div id="elements-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;"></div>
+
+    <div id="toolbar">
+      <button class="tool-btn active" id="tool-select" title="Select">↖</button>
+      <button class="tool-btn" id="tool-clear" title="Clear screen">⌫</button>
+    </div>
+
+    <!-- API key bar (shown when no key is set) -->
+    <div id="api-key-bar">
+      <span>API key required:</span>
+      <input id="api-key-input" type="password" placeholder="sk-ant-..." />
+      <button id="api-key-save">Save</button>
+      <span style="color:var(--muted);font-size:10px;">Stored in memory only, not saved to disk</span>
+    </div>
+
+    <div id="log"></div>
+  </div>
+
+  <div id="input-bar">
+    <input id="cmd-input" placeholder='Try: "draw a simple web app architecture" or "add a purple box called Frontend"' />
+    <button id="send-btn">Send</button>
+    <span id="status">ready</span>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// Configuration
+// ─────────────────────────────────────────────
+const API_URL = "https://api.anthropic.com/v1/messages";
+let API_KEY = "";
+
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+let screens = { 1: [], 2: [] };
+let activeScreen = 1;
+let nextId = 1;
+let dragging = null;
+let dragOffset = { x: 0, y: 0 };
+
+// ─────────────────────────────────────────────
+// DOM refs
+// ─────────────────────────────────────────────
+const canvasArea  = document.getElementById('canvas-area');
+const elemLayer   = document.getElementById('elements-layer');
+const arrowsSvg   = document.getElementById('arrows-svg');
+const cmdInput    = document.getElementById('cmd-input');
+const sendBtn     = document.getElementById('send-btn');
+const statusEl    = document.getElementById('status');
+const logEl       = document.getElementById('log');
+const tabsEl      = document.getElementById('screen-tabs');
+const apiKeyBar   = document.getElementById('api-key-bar');
+const apiKeyInput = document.getElementById('api-key-input');
+
+// ─────────────────────────────────────────────
+// API key handling
+// ─────────────────────────────────────────────
+document.getElementById('api-key-save').onclick = () => {
+  API_KEY = apiKeyInput.value.trim();
+  if (API_KEY) {
+    apiKeyBar.style.display = 'none';
+    addLog('API key set. Ready to use.', 'info');
+  }
+};
+
+// ─────────────────────────────────────────────
+// Grid drawing
+// ─────────────────────────────────────────────
+function drawGrid() {
+  const c = document.getElementById('grid-canvas');
+  c.width  = canvasArea.offsetWidth;
+  c.height = canvasArea.offsetHeight;
+  const ctx = c.getContext('2d');
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth   = 0.5;
+  const step = 40;
+  for (let x = 0; x < c.width; x += step) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, c.height); ctx.stroke();
+  }
+  for (let y = 0; y < c.height; y += step) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(c.width, y); ctx.stroke();
+  }
+}
+drawGrid();
+window.addEventListener('resize', drawGrid);
+
+// ─────────────────────────────────────────────
+// Screen tabs
+// ─────────────────────────────────────────────
+function renderTabs() {
+  tabsEl.innerHTML = '';
+  Object.keys(screens).forEach(id => {
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (parseInt(id) === activeScreen ? ' active' : '');
+    btn.textContent = 'Screen ' + id;
+    btn.onclick = () => {
+      activeScreen = parseInt(id);
+      renderTabs();
+      renderElements();
+    };
+    tabsEl.appendChild(btn);
+  });
+}
+
+document.getElementById('add-screen').onclick = () => {
+  const id = Math.max(...Object.keys(screens).map(Number)) + 1;
+  screens[id] = [];
+  activeScreen = id;
+  renderTabs();
+  renderElements();
+  addLog(`Created screen ${id}`, 'info');
+};
+
+// ─────────────────────────────────────────────
+// Color helper
+// ─────────────────────────────────────────────
+function getColorClass(color) {
+  const map = {
+    purple: 'color-purple',
+    pink:   'color-pink',
+    teal:   'color-teal',
+    amber:  'color-amber',
+    gray:   'color-gray',
+  };
+  return map[color] || 'color-purple';
+}
+
+// ─────────────────────────────────────────────
+// Render elements
+// ─────────────────────────────────────────────
+function renderElements() {
+  elemLayer.innerHTML = '';
+  arrowsSvg.innerHTML = '';
+
+  const els   = screens[activeScreen] || [];
+  const byId  = {};
+  els.forEach(e => { byId[e.id] = e; });
+
+  // Render shapes
+  els.forEach(el => {
+    if (el.type === 'arrow') return;
+
+    const div = document.createElement('div');
+    div.className = `wb-element wb-${el.type} ${getColorClass(el.color || 'purple')}`;
+    div.id        = 'el-' + el.id;
+    div.style.left = el.x + 'px';
+    div.style.top  = el.y + 'px';
+    div.textContent = el.label || '';
+    div.dataset.id  = el.id;
+
+    const del = document.createElement('button');
+    del.className   = 'delete-btn';
+    del.textContent = '×';
+    del.onclick     = e => { e.stopPropagation(); removeElement(el.id); };
+    div.appendChild(del);
+
+    div.addEventListener('mousedown', startDrag);
+    elemLayer.appendChild(div);
+  });
+
+  // Render arrows
+  ensureArrowDefs();
+  els.filter(e => e.type === 'arrow').forEach(arrow => {
+    const from = byId[arrow.from];
+    const to   = byId[arrow.to];
+    if (!from || !to) return;
+    drawArrow(from, to, arrow.label);
+  });
+}
+
+function ensureArrowDefs() {
+  if (arrowsSvg.querySelector('#arrowhead')) return;
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  defs.innerHTML = `
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#7c6af7"/>
+    </marker>`;
+  arrowsSvg.appendChild(defs);
+}
+
+function getCenter(el) {
+  const w = el.type === 'circle' ? 90 : (el.type === 'sticky' ? 160 : 120);
+  const h = el.type === 'circle' ? 90 : (el.type === 'sticky' ? 70  : 40);
+  return { x: el.x + w / 2, y: el.y + h / 2 };
+}
+
+function drawArrow(from, to, label) {
+  const f = getCenter(from);
+  const t = getCenter(to);
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', f.x); line.setAttribute('y1', f.y);
+  line.setAttribute('x2', t.x); line.setAttribute('y2', t.y);
+  line.setAttribute('stroke', '#7c6af7');
+  line.setAttribute('stroke-width', '1.5');
+  line.setAttribute('stroke-dasharray', '5 3');
+  line.setAttribute('marker-end', 'url(#arrowhead)');
+  arrowsSvg.appendChild(line);
+
+  if (label) {
+    const mx  = (f.x + t.x) / 2;
+    const my  = (f.y + t.y) / 2;
+    const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    txt.setAttribute('x', mx);
+    txt.setAttribute('y', my - 6);
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('fill', '#6b6b80');
+    txt.setAttribute('font-size', '11');
+    txt.setAttribute('font-family', 'DM Mono, monospace');
+    txt.textContent = label;
+    arrowsSvg.appendChild(txt);
+  }
+}
+
+function removeElement(id) {
+  screens[activeScreen] = screens[activeScreen].filter(
+    e => e.id !== id && e.from !== id && e.to !== id
+  );
+  renderElements();
+}
+
+// ─────────────────────────────────────────────
+// Drag-and-drop
+// ─────────────────────────────────────────────
+function startDrag(e) {
+  const el   = e.currentTarget;
+  dragging   = { domEl: el, id: parseInt(el.dataset.id) };
+  const rect = el.getBoundingClientRect();
+  dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  el.classList.add('selected');
+  e.preventDefault();
+}
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const areaRect = canvasArea.getBoundingClientRect();
+  const nx = e.clientX - areaRect.left - dragOffset.x;
+  const ny = e.clientY - areaRect.top  - dragOffset.y;
+  dragging.domEl.style.left = nx + 'px';
+  dragging.domEl.style.top  = ny + 'px';
+  const data = screens[activeScreen].find(x => x.id === dragging.id);
+  if (data) { data.x = nx; data.y = ny; }
+  renderElements();
+  // Re-apply position after render (renderElements recreates DOM)
+  const fresh = document.getElementById('el-' + dragging.id);
+  if (fresh) {
+    fresh.style.left = nx + 'px';
+    fresh.style.top  = ny + 'px';
+    dragging.domEl   = fresh;
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (dragging) {
+    dragging.domEl.classList.remove('selected');
+    dragging = null;
+  }
+});
+
+document.getElementById('tool-clear').onclick = () => {
+  screens[activeScreen] = [];
+  renderElements();
+  addLog(`Cleared screen ${activeScreen}`, 'info');
+};
+
+// ─────────────────────────────────────────────
+// Activity log
+// ─────────────────────────────────────────────
+function addLog(msg, type = 'action') {
+  const d = document.createElement('div');
+  d.className  = 'log-entry ' + type;
+  d.textContent = '> ' + msg;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ─────────────────────────────────────────────
+// Claude tool definitions
+// ─────────────────────────────────────────────
+const tools = [
+  {
+    name: "add_element",
+    description: "Add a shape or sticky note to the whiteboard",
+    input_schema: {
+      type: "object",
+      properties: {
+        type:   { type: "string", enum: ["box", "circle", "sticky"], description: "Shape type" },
+        label:  { type: "string",  description: "Text label on the element" },
+        color:  { type: "string",  enum: ["purple", "pink", "teal", "amber", "gray"], description: "Color theme" },
+        x:      { type: "number", description: "X position in pixels" },
+        y:      { type: "number", description: "Y position in pixels" },
+        screen: { type: "number", description: "Which screen to place it on (defaults to active screen)" }
+      },
+      required: ["type", "label"]
+    }
+  },
+  {
+    name: "add_arrow",
+    description: "Draw a dashed arrow connecting two elements by their text labels",
+    input_schema: {
+      type: "object",
+      properties: {
+        from_label: { type: "string", description: "Label of the source element" },
+        to_label:   { type: "string", description: "Label of the destination element" },
+        label:      { type: "string", description: "Optional label shown on the arrow" }
+      },
+      required: ["from_label", "to_label"]
+    }
+  },
+  {
+    name: "move_element",
+    description: "Move an existing element to a new x/y position",
+    input_schema: {
+      type: "object",
+      properties: {
+        label: { type: "string", description: "Label of the element to move" },
+        x:     { type: "number", description: "New X position in pixels" },
+        y:     { type: "number", description: "New Y position in pixels" }
+      },
+      required: ["label", "x", "y"]
+    }
+  },
+  {
+    name: "update_label",
+    description: "Change the text label of an existing element",
+    input_schema: {
+      type: "object",
+      properties: {
+        old_label: { type: "string", description: "Current label of the element" },
+        new_label: { type: "string", description: "New label to apply" }
+      },
+      required: ["old_label", "new_label"]
+    }
+  },
+  {
+    name: "delete_element",
+    description: "Remove an element (and any connected arrows) by its label",
+    input_schema: {
+      type: "object",
+      properties: {
+        label: { type: "string", description: "Label of the element to remove" }
+      },
+      required: ["label"]
+    }
+  },
+  {
+    name: "switch_screen",
+    description: "Switch focus to a different screen number",
+    input_schema: {
+      type: "object",
+      properties: {
+        screen: { type: "number", description: "Screen number to switch to" }
+      },
+      required: ["screen"]
+    }
+  },
+  {
+    name: "clear_screen",
+    description: "Remove all elements from a screen",
+    input_schema: {
+      type: "object",
+      properties: {
+        screen: { type: "number", description: "Screen to clear (defaults to active screen)" }
+      },
+      required: []
+    }
+  }
+];
+
+// ─────────────────────────────────────────────
+// Execute a tool call
+// ─────────────────────────────────────────────
+function execTool(name, input) {
+  addLog(`${name}(${JSON.stringify(input)})`, 'action');
+
+  if (name === 'switch_screen') {
+    if (screens[input.screen]) {
+      activeScreen = input.screen;
+      renderTabs();
+      renderElements();
+    }
+    return { ok: true };
+  }
+
+  if (name === 'clear_screen') {
+    const sc = input.screen || activeScreen;
+    if (screens[sc]) {
+      screens[sc] = [];
+      if (sc === activeScreen) renderElements();
+    }
+    return { ok: true };
+  }
+
+  if (name === 'add_element') {
+    const sc = input.screen || activeScreen;
+    if (!screens[sc]) screens[sc] = [];
+
+    // Auto-layout if no position given
+    const existing = screens[sc].filter(e => e.type !== 'arrow').length;
+    const cols = 4;
+    const col  = existing % cols;
+    const row  = Math.floor(existing / cols);
+
+    const el = {
+      id:    nextId++,
+      type:  input.type  || 'box',
+      label: input.label,
+      color: input.color || 'purple',
+      x:     input.x !== undefined ? input.x : 80 + col * 170,
+      y:     input.y !== undefined ? input.y : 80 + row * 130,
+    };
+    screens[sc].push(el);
+    if (sc === activeScreen) renderElements();
+    return { ok: true, id: el.id };
+  }
+
+  if (name === 'add_arrow') {
+    const els  = screens[activeScreen];
+    const from = els.find(e => e.label && e.label.toLowerCase() === input.from_label.toLowerCase());
+    const to   = els.find(e => e.label && e.label.toLowerCase() === input.to_label.toLowerCase());
+    if (!from || !to) return { ok: false, error: `Element not found: "${input.from_label}" or "${input.to_label}"` };
+    els.push({ id: nextId++, type: 'arrow', from: from.id, to: to.id, label: input.label || '' });
+    renderElements();
+    return { ok: true };
+  }
+
+  if (name === 'move_element') {
+    const el = screens[activeScreen].find(e => e.label && e.label.toLowerCase() === input.label.toLowerCase());
+    if (!el) return { ok: false, error: `Element not found: "${input.label}"` };
+    el.x = input.x;
+    el.y = input.y;
+    renderElements();
+    return { ok: true };
+  }
+
+  if (name === 'update_label') {
+    const el = screens[activeScreen].find(e => e.label && e.label.toLowerCase() === input.old_label.toLowerCase());
+    if (!el) return { ok: false, error: `Element not found: "${input.old_label}"` };
+    el.label = input.new_label;
+    renderElements();
+    return { ok: true };
+  }
+
+  if (name === 'delete_element') {
+    const el = screens[activeScreen].find(e => e.label && e.label.toLowerCase() === input.label.toLowerCase());
+    if (!el) return { ok: false, error: `Element not found: "${input.label}"` };
+    removeElement(el.id);
+    return { ok: true };
+  }
+
+  return { ok: false, error: 'Unknown tool: ' + name };
+}
+
+// ─────────────────────────────────────────────
+// Call Claude API with tool-use loop
+// ─────────────────────────────────────────────
+async function sendCommand(text) {
+  if (!API_KEY) {
+    apiKeyBar.style.display = 'flex';
+    addLog('No API key set — enter it above.', 'error');
+    return;
+  }
+
+  sendBtn.disabled     = true;
+  statusEl.textContent = 'thinking…';
+  statusEl.className   = 'thinking';
+
+  // Build a concise snapshot of all screens for context
+  const stateSnapshot = JSON.stringify(
+    Object.entries(screens).map(([id, els]) => ({
+      screen: parseInt(id),
+      elements: els.map(e => ({
+        id:    e.id,
+        type:  e.type,
+        label: e.label,
+        x:     Math.round(e.x),
+        y:     Math.round(e.y),
+        color: e.color,
+        ...(e.type === 'arrow' ? { from: e.from, to: e.to } : {})
+      }))
+    }))
+  );
+
+  const systemPrompt = `You are an AI controller for a multi-screen visual whiteboard tool.
+
+Current whiteboard state (JSON):
+${stateSnapshot}
+
+Active screen: ${activeScreen}
+Available screens: ${Object.keys(screens).join(', ')}
+Canvas size: approximately 900x500 px per screen
+
+Instructions:
+- Use tool calls to manipulate the whiteboard. Call multiple tools in sequence as needed.
+- Spread elements across the canvas — avoid stacking them. Use the full 900x500 space.
+- For architecture / flow diagrams, lay out left-to-right or top-to-bottom.
+- For arrows: the source and destination elements must already exist before calling add_arrow.
+- Color conventions: purple = primary/default, teal = data/storage, amber = queues/warnings, pink = external services, gray = neutral/infra.
+- After completing the actions, respond with a brief one-sentence summary of what you did.`;
+
+  const messages = [{ role: 'user', content: text }];
+
+  try {
+    let keepGoing = true;
+
+    while (keepGoing) {
+      const resp = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key':    API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model:      'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system:     systemPrompt,
+          tools,
+          messages,
+        })
+      });
+
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error.message);
+
+      messages.push({ role: 'assistant', content: data.content });
+
+      const toolUses = data.content.filter(b => b.type === 'tool_use');
+
+      if (toolUses.length === 0 || data.stop_reason === 'end_turn') {
+        keepGoing = false;
+        const textBlock = data.content.find(b => b.type === 'text');
+        if (textBlock) addLog(textBlock.text, 'info');
+      } else {
+        // Execute all tool calls and return results
+        const toolResults = toolUses.map(tu => {
+          const result = execTool(tu.name, tu.input);
+          return {
+            type:        'tool_result',
+            tool_use_id: tu.id,
+            content:     JSON.stringify(result),
+          };
+        });
+        messages.push({ role: 'user', content: toolResults });
+
+        if (data.stop_reason === 'end_turn') keepGoing = false;
+      }
+    }
+
+    statusEl.textContent = 'ready';
+    statusEl.className   = '';
+  } catch (err) {
+    statusEl.textContent = 'error';
+    statusEl.className   = 'error';
+    addLog(err.message, 'error');
+    console.error(err);
+  }
+
+  sendBtn.disabled = false;
+}
+
+// ─────────────────────────────────────────────
+// Input handling
+// ─────────────────────────────────────────────
+sendBtn.onclick = () => {
+  const v = cmdInput.value.trim();
+  if (!v) return;
+  addLog(v, 'info');
+  cmdInput.value = '';
+  sendCommand(v);
+};
+
+cmdInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendBtn.click();
+});
+
+// ─────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────
+renderTabs();
+renderElements();
+addLog('Whiteboard ready. Enter your Anthropic API key above.', 'info');
+addLog('Then try: "draw a simple web app architecture"', 'info');
+</script>
+</body>
+</html>
