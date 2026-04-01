@@ -498,6 +498,271 @@
       transition: all 0.12s;
     }
     #calib-recalibrate:hover { background: var(--surface2); color: var(--text); }
+
+    /* ══════════════════════════════════════════════════════════
+       ONBOARDING WIZARD
+    ══════════════════════════════════════════════════════════ */
+    #onboarding {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0a0a0e;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Syne', sans-serif;
+      overflow: hidden;
+    }
+    #onboarding.hidden { display: none; }
+
+    /* Subtle grid background */
+    #onboarding::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(91,77,224,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(91,77,224,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    #ob-container {
+      position: relative; z-index: 1;
+      width: 520px; max-width: 94vw;
+    }
+
+    /* Progress dots */
+    #ob-dots {
+      display: flex; gap: 8px; justify-content: center; margin-bottom: 40px;
+    }
+    .ob-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); transition: all 0.3s;
+    }
+    .ob-dot.active { background: #5b4de0; width: 24px; border-radius: 3px; }
+    .ob-dot.done   { background: rgba(91,77,224,0.5); }
+
+    /* Page */
+    .ob-page {
+      display: none; flex-direction: column;
+      animation: ob-in 0.35s cubic-bezier(0.22,1,0.36,1);
+    }
+    .ob-page.active { display: flex; }
+    @keyframes ob-in {
+      from { opacity: 0; transform: translateX(30px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes ob-out {
+      from { opacity: 1; transform: translateX(0); }
+      to   { opacity: 0; transform: translateX(-30px); }
+    }
+    .ob-page.leaving {
+      display: flex;
+      animation: ob-out 0.25s cubic-bezier(0.22,1,0.36,1) forwards;
+    }
+
+    /* Typography */
+    .ob-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px; letter-spacing: 0.18em;
+      color: #5b4de0; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .ob-title {
+      font-size: 32px; font-weight: 700;
+      color: #ffffff; line-height: 1.15;
+      letter-spacing: -0.02em; margin-bottom: 12px;
+    }
+    .ob-subtitle {
+      font-size: 14px; color: rgba(255,255,255,0.45);
+      line-height: 1.6; margin-bottom: 36px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* Input fields */
+    .ob-field { margin-bottom: 16px; }
+    .ob-label {
+      display: block; font-family: 'DM Mono', monospace;
+      font-size: 10px; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.4); text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .ob-input {
+      width: 100%; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 13px 16px;
+      color: #ffffff; font-family: 'DM Mono', monospace;
+      font-size: 13px; outline: none; transition: all 0.2s;
+    }
+    .ob-input:focus { border-color: #5b4de0; background: rgba(91,77,224,0.08); }
+    .ob-input::placeholder { color: rgba(255,255,255,0.2); }
+    select.ob-input option { background: #1a1a2e; color: #fff; }
+
+    /* Status line */
+    .ob-status {
+      font-family: 'DM Mono', monospace; font-size: 11px;
+      height: 18px; margin-top: 8px; transition: all 0.2s;
+    }
+    .ob-status.ok    { color: #44cc77; }
+    .ob-status.error { color: #e8335a; }
+    .ob-status.info  { color: #5b4de0; }
+
+    /* Choice grid */
+    .ob-choices {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 10px; margin-bottom: 16px;
+    }
+    .ob-choices.cols3 { grid-template-columns: repeat(3, 1fr); }
+    .ob-choice {
+      background: rgba(255,255,255,0.05);
+      border: 1.5px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 14px 16px;
+      cursor: pointer; transition: all 0.15s;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .ob-choice:hover { border-color: rgba(91,77,224,0.5); background: rgba(91,77,224,0.07); }
+    .ob-choice.selected { border-color: #5b4de0; background: rgba(91,77,224,0.12); }
+    .ob-choice .ch-icon  { font-size: 20px; margin-bottom: 4px; }
+    .ob-choice .ch-label { font-size: 13px; font-weight: 600; color: #fff; }
+    .ob-choice .ch-desc  { font-family: 'DM Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.4); }
+
+    /* Slider row */
+    .ob-slider-row {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 16px;
+    }
+    .ob-slider-row label {
+      font-family: 'DM Mono', monospace; font-size: 11px;
+      color: rgba(255,255,255,0.5); white-space: nowrap; min-width: 80px;
+    }
+    .ob-slider-row input[type=range] {
+      flex: 1; accent-color: #5b4de0; cursor: pointer;
+    }
+    .ob-slider-val {
+      font-family: 'DM Mono', monospace; font-size: 12px;
+      color: #fff; min-width: 36px; text-align: right;
+    }
+
+    /* Toggle row */
+    .ob-toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .ob-toggle-row:last-child { border-bottom: none; }
+    .ob-toggle-row .tg-info { display: flex; flex-direction: column; gap: 3px; }
+    .ob-toggle-row .tg-label { font-size: 13px; font-weight: 600; color: #fff; }
+    .ob-toggle-row .tg-desc  { font-family: 'DM Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.4); }
+    .ob-toggle {
+      width: 40px; height: 22px; border-radius: 11px;
+      background: rgba(255,255,255,0.12); cursor: pointer;
+      position: relative; transition: background 0.2s; flex-shrink: 0;
+      border: none;
+    }
+    .ob-toggle.on { background: #5b4de0; }
+    .ob-toggle::after {
+      content: ''; position: absolute;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: white; top: 3px; left: 3px;
+      transition: transform 0.2s;
+    }
+    .ob-toggle.on::after { transform: translateX(18px); }
+
+    /* Waveform */
+    #ob-waveform {
+      width: 100%; height: 48px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 8px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 8px;
+    }
+
+    /* Color swatches for accent */
+    .ob-colors {
+      display: flex; gap: 10px; margin-bottom: 20px;
+    }
+    .ob-color {
+      width: 32px; height: 32px; border-radius: 50%;
+      cursor: pointer; border: 2.5px solid transparent;
+      transition: all 0.15s;
+    }
+    .ob-color.selected { border-color: white; transform: scale(1.15); }
+
+    /* Buttons */
+    .ob-btn-row {
+      display: flex; gap: 10px; margin-top: 8px; align-items: center;
+    }
+    .ob-btn {
+      flex: 1; padding: 14px; border-radius: 10px;
+      font-family: 'Syne', sans-serif; font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+      border: none; letter-spacing: 0.02em;
+    }
+    .ob-btn.primary { background: #5b4de0; color: white; }
+    .ob-btn.primary:hover { background: #7060f0; transform: translateY(-1px); }
+    .ob-btn.primary:disabled { background: rgba(91,77,224,0.4); cursor: not-allowed; transform: none; }
+    .ob-btn.secondary {
+      background: rgba(255,255,255,0.07);
+      color: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.1);
+      flex: 0 0 auto; padding: 14px 20px;
+    }
+    .ob-btn.secondary:hover { background: rgba(255,255,255,0.12); color: white; }
+    .ob-btn.ghost {
+      background: none; border: none;
+      color: rgba(255,255,255,0.3); font-size: 12px;
+      font-family: 'DM Mono', monospace; flex: 0 0 auto;
+      padding: 0; cursor: pointer;
+    }
+    .ob-btn.ghost:hover { color: rgba(255,255,255,0.6); }
+
+    /* Summary card */
+    .ob-summary {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 20px;
+      margin-bottom: 24px;
+    }
+    .ob-summary-row {
+      display: flex; justify-content: space-between;
+      align-items: center; padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-family: 'DM Mono', monospace; font-size: 11px;
+    }
+    .ob-summary-row:last-child { border-bottom: none; }
+    .ob-summary-row .sr-key   { color: rgba(255,255,255,0.35); }
+    .ob-summary-row .sr-val   { color: #fff; font-weight: 500; }
+
+    /* Remember checkbox */
+    .ob-remember {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'DM Mono', monospace; font-size: 11px;
+      color: rgba(255,255,255,0.4); cursor: pointer;
+      margin-bottom: 20px;
+    }
+    .ob-remember input { accent-color: #5b4de0; cursor: pointer; width: 14px; height: 14px; }
+
+    /* Return banner (shown when settings remembered) */
+    #ob-return-banner {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0a0a0e;
+      display: none; align-items: center; justify-content: center;
+      flex-direction: column; gap: 20px;
+      font-family: 'Syne', sans-serif;
+    }
+    #ob-return-banner.show { display: flex; }
+    #ob-return-banner .rb-logo {
+      font-family: 'DM Mono', monospace; font-size: 12px;
+      color: #5b4de0; letter-spacing: 0.15em;
+    }
+    #ob-return-banner .rb-msg {
+      font-size: 15px; color: rgba(255,255,255,0.5);
+      font-family: 'DM Mono', monospace;
+    }
+    #ob-return-banner .rb-btn-row { display: flex; gap: 12px; }
+    #ob-return-banner button {
+      padding: 10px 24px; border-radius: 8px; cursor: pointer;
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+      transition: all 0.15s; border: none;
+    }
+    #ob-return-banner .rb-enter { background: #5b4de0; color: white; }
+    #ob-return-banner .rb-enter:hover { background: #7060f0; }
+    #ob-return-banner .rb-change { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
+    #ob-return-banner .rb-change:hover { background: rgba(255,255,255,0.14); color: white; }
   </style>
 </head>
 <body>
@@ -657,11 +922,10 @@
       <button id="edit-apply">Apply changes</button>
     </div>
 
-    <div id="api-key-bar">
-      <span>API key required:</span>
-      <input id="api-key-input" type="password" placeholder="sk-ant-..." />
-      <button id="api-key-save">Save</button>
-      <span class="key-hint">Stored in memory only · not saved to disk</span>
+    <!-- API key bar removed — handled by onboarding wizard -->
+    <div id="api-key-bar" style="display:none">
+      <input id="api-key-input" type="hidden" />
+      <button id="api-key-save" style="display:none"></button>
     </div>
 
     <div id="log"></div>
@@ -1053,8 +1317,16 @@ document.addEventListener('mousemove', e => {
 });
 
 document.addEventListener('mouseup', () => {
-  if (dragging) { dragging.domEl.classList.remove('selected'); dragging = null; }
-  if (resizing) { resizing = null; renderElements(); }
+  if (dragging) {
+    dragging.domEl.classList.remove('selected');
+    dragging = null;
+    scheduleSave(); // sync position change to other clients
+  }
+  if (resizing) {
+    resizing = null;
+    renderElements();
+    scheduleSave(); // sync resize to other clients
+  }
 });
 
 // ── Drawing state ─────────────────────────────────────────────
@@ -1148,6 +1420,7 @@ drawingSvg.addEventListener('mousemove', e => {
     if (live) live.setAttribute('d', pointsToD(currentStroke.points));
   } else if (activeTool === 'eraser') {
     eraseAt(pos);
+    scheduleSave(); // sync erase to other clients
   }
 });
 
@@ -1159,6 +1432,7 @@ drawingSvg.addEventListener('mouseup', e => {
     drawingHistory[activeScreen].push(currentStroke);
     currentStroke = null;
     renderDrawings();
+    scheduleSave(); // sync drawing stroke to other clients
   }
 });
 
@@ -1509,8 +1783,11 @@ const webSearchTool = {
 
 // ── AI call ────────────────────────────────────────────────────
 async function sendCommand(text) {
-  if (!API_KEY) { document.getElementById('api-key-bar').style.display = 'flex'; addLog('No API key set.', 'error'); return; }
-  if (API_KEY.length < 20) { addLog('API key looks too short — re-enter it.', 'error'); document.getElementById('api-key-bar').style.display = 'flex'; return; }
+  if (!API_KEY || API_KEY.length < 20) {
+    addLog('No API key — please complete the setup wizard (refresh to restart it).', 'error');
+    document.getElementById('onboarding').classList.remove('hidden');
+    return;
+  }
 
   sendBtn.disabled = true;
   statusEl.textContent = 'thinking…'; statusEl.className = 'thinking';
@@ -2413,8 +2690,555 @@ setTimeout(() => tryAutoJoin(5), 1000);
 // ── Init ───────────────────────────────────────────────────────
 renderTabs();
 renderElements();
-addLog('Ready. Enter your Anthropic API key above to start.', 'info');
+addLog('Inator ready.', 'info');
 addLog('Click 🎤 to activate wake word — say "Hey Wall …command… Send it"', 'info');
+
+// ══════════════════════════════════════════════════════════
+// ONBOARDING WIZARD
+// ══════════════════════════════════════════════════════════
+const OB_STORAGE_KEY = 'inator_settings_v1';
+let obCurrentPage    = 0;
+let obSettings       = {
+  apiKey:      '',
+  theme:       'light',
+  textSize:    'md',
+  accent:      '#5b4de0',
+  micDeviceId: '',
+  camDeviceId: '',
+  silenceDelay: 1.8,
+  faceEnabled:  true,
+  fingerEnabled: true,
+};
+let obMicStream    = null;
+let obAudioContext = null;
+let obAnalyser     = null;
+let obWaveAnim     = null;
+
+// ── Helpers ────────────────────────────────────────────────
+function obSetStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'ob-status ' + (type || '');
+}
+function obClearStatus(id) { obSetStatus(id, ''); }
+
+function obChoice(el, groupId) {
+  document.querySelectorAll('#' + groupId + ' .ob-choice').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function obAccent(el) {
+  document.querySelectorAll('#ob-accent-colors .ob-color').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  obSettings.accent = el.dataset.color;
+  // Live preview accent on the onboarding itself
+  document.documentElement.style.setProperty('--ob-accent-preview', el.dataset.color);
+}
+
+function obToggle(btn) {
+  btn.classList.toggle('on');
+}
+
+// ── Navigation ─────────────────────────────────────────────
+function obNext() {
+  const pages = document.querySelectorAll('.ob-page');
+  if (obCurrentPage >= pages.length - 1) return;
+  const current = pages[obCurrentPage];
+  current.classList.add('leaving');
+  setTimeout(() => {
+    current.classList.remove('active', 'leaving');
+    obCurrentPage++;
+    pages[obCurrentPage].classList.add('active');
+    obUpdateDots();
+    if (obCurrentPage === 3) obLoadMicDevices();
+    if (obCurrentPage === 4) obLoadCamDevices();
+    if (obCurrentPage === 5) obBuildSummary();
+  }, 250);
+}
+
+function obBack() {
+  if (obCurrentPage === 0) return;
+  const pages = document.querySelectorAll('.ob-page');
+  pages[obCurrentPage].classList.remove('active');
+  obCurrentPage--;
+  pages[obCurrentPage].classList.add('active');
+  obUpdateDots();
+}
+
+function obUpdateDots() {
+  document.querySelectorAll('.ob-dot').forEach((dot, i) => {
+    dot.classList.remove('active', 'done');
+    if (i === obCurrentPage) dot.classList.add('active');
+    else if (i < obCurrentPage) dot.classList.add('done');
+  });
+}
+
+// ── Page 1: API key test ───────────────────────────────────
+async function obTestKey() {
+  const key = document.getElementById('ob-api-key').value.replace(/[\s​﻿]/g, '');
+  if (!key || key.length < 20) {
+    obSetStatus('ob-key-status', 'Key looks too short — check you copied the full key', 'error'); return;
+  }
+  const btn = document.getElementById('ob-key-btn');
+  btn.textContent = 'Testing…'; btn.disabled = true;
+  obSetStatus('ob-key-status', 'Connecting to Claude…', 'info');
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'hi' }]
+      })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message);
+    obSettings.apiKey = key;
+    obSetStatus('ob-key-status', '✓ Connected to Claude successfully', 'ok');
+    btn.textContent = 'Connected ✓'; btn.style.background = '#44cc77';
+    setTimeout(() => obNext(), 800);
+  } catch(e) {
+    obSetStatus('ob-key-status', '✗ ' + e.message, 'error');
+    btn.textContent = 'Test & Continue'; btn.disabled = false;
+  }
+}
+
+// ── Page 3: Mic devices ────────────────────────────────────
+async function obLoadMicDevices() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(t => t.stop());
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const mics = devices.filter(d => d.kind === 'audioinput');
+    const sel  = document.getElementById('ob-mic-select');
+    sel.innerHTML = mics.map(d =>
+      `<option value="${d.deviceId}">${d.label || 'Microphone ' + d.deviceId.slice(0,6)}</option>`
+    ).join('');
+    if (mics.length === 0) sel.innerHTML = '<option>No microphones found</option>';
+  } catch(e) {
+    document.getElementById('ob-mic-select').innerHTML = '<option>Permission denied</option>';
+  }
+}
+
+async function obTestMic() {
+  const btn = document.getElementById('ob-mic-test-btn');
+  if (obMicStream) {
+    // Stop test
+    obMicStream.getTracks().forEach(t => t.stop());
+    obMicStream = null;
+    if (obWaveAnim) { cancelAnimationFrame(obWaveAnim); obWaveAnim = null; }
+    if (obAudioContext) { obAudioContext.close(); obAudioContext = null; }
+    btn.textContent = 'Test mic';
+    obSetStatus('ob-mic-status', 'Test stopped', 'info');
+    return;
+  }
+  const deviceId = document.getElementById('ob-mic-select').value;
+  try {
+    obMicStream = await navigator.mediaDevices.getUserMedia({
+      audio: deviceId ? { deviceId: { exact: deviceId } } : true
+    });
+    obAudioContext = new AudioContext();
+    obAnalyser     = obAudioContext.createAnalyser();
+    obAnalyser.fftSize = 256;
+    obAudioContext.createMediaStreamSource(obMicStream).connect(obAnalyser);
+    btn.textContent = 'Stop test';
+    obSetStatus('ob-mic-status', '✓ Mic is working — speak to see the waveform', 'ok');
+    obDrawWaveform();
+  } catch(e) {
+    obSetStatus('ob-mic-status', '✗ ' + e.message, 'error');
+  }
+}
+
+function obDrawWaveform() {
+  const canvas = document.getElementById('ob-waveform');
+  const ctx    = canvas.getContext('2d');
+  canvas.width  = canvas.offsetWidth  || 480;
+  canvas.height = canvas.offsetHeight || 48;
+  const buf = new Uint8Array(obAnalyser.frequencyBinCount);
+
+  function draw() {
+    obWaveAnim = requestAnimationFrame(draw);
+    obAnalyser.getByteTimeDomainData(buf);
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#5b4de0'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const sliceW = canvas.width / buf.length;
+    let x = 0;
+    for (let i = 0; i < buf.length; i++) {
+      const v = buf[i] / 128;
+      const y = v * canvas.height / 2;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      x += sliceW;
+    }
+    ctx.stroke();
+  }
+  draw();
+}
+
+// ── Page 4: Camera devices ─────────────────────────────────
+async function obLoadCamDevices() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    stream.getTracks().forEach(t => t.stop());
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d => d.kind === 'videoinput');
+    const sel  = document.getElementById('ob-cam-select');
+    sel.innerHTML = '<option value="">None</option>' + cams.map(d =>
+      `<option value="${d.deviceId}">${d.label || 'Camera ' + d.deviceId.slice(0,6)}</option>`
+    ).join('');
+  } catch(e) {
+    document.getElementById('ob-cam-select').innerHTML = '<option value="">Camera permission denied</option>';
+  }
+}
+
+// ── Page 5: Summary ────────────────────────────────────────
+function obBuildSummary() {
+  // Read current selections
+  const themeEl  = document.querySelector('#ob-theme-choices .ob-choice.selected');
+  const sizeEl   = document.querySelector('#ob-size-choices .ob-choice.selected');
+  const micEl    = document.getElementById('ob-mic-select');
+  const camEl    = document.getElementById('ob-cam-select');
+  const silence  = document.getElementById('ob-silence-slider').value;
+  const face     = document.getElementById('ob-face-toggle').classList.contains('on');
+  const finger   = document.getElementById('ob-finger-toggle').classList.contains('on');
+  const micLabel = micEl.options[micEl.selectedIndex]?.text || 'Default';
+  const camLabel = camEl.options[camEl.selectedIndex]?.text || 'None';
+
+  // Save to settings object
+  obSettings.theme        = themeEl?.dataset.val  || 'light';
+  obSettings.textSize     = sizeEl?.dataset.val   || 'md';
+  obSettings.micDeviceId  = micEl?.value          || '';
+  obSettings.camDeviceId  = camEl?.value          || '';
+  obSettings.silenceDelay = parseFloat(silence);
+  obSettings.faceEnabled  = face;
+  obSettings.fingerEnabled = finger;
+
+  const rows = [
+    ['Theme',          themeEl?.querySelector('.ch-label')?.textContent || 'Light'],
+    ['Text size',      sizeEl?.querySelector('.ch-label')?.textContent  || 'Medium'],
+    ['Accent color',   `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${obSettings.accent};vertical-align:middle;margin-right:6px"></span>${obSettings.accent}`],
+    ['Microphone',     micLabel],
+    ['Camera',         camLabel],
+    ['Silence timer',  parseFloat(silence).toFixed(1) + 's'],
+    ['Face detection', face   ? '✓ On' : '✗ Off'],
+    ['Finger tracking',finger ? '✓ On' : '✗ Off'],
+  ];
+
+  document.getElementById('ob-summary').innerHTML = rows.map(([k,v]) =>
+    `<div class="ob-summary-row"><span class="sr-key">${k}</span><span class="sr-val">${v}</span></div>`
+  ).join('');
+}
+
+// ── Apply settings & enter ─────────────────────────────────
+function applyTheme(theme) {
+  const themes = {
+    light: { bg:'#ffffff', surface:'#f5f5f7', surface2:'#ebebee', border:'#dcdce4', text:'#111118', muted:'#7a7a8c', canvasBg:'#ffffff' },
+    dark:  { bg:'#0f0f11', surface:'#1a1a1f', surface2:'#222228', border:'#2e2e38', text:'#e8e8f0', muted:'#6b6b80', canvasBg:'#13131a' },
+    slate: { bg:'#1e2029', surface:'#252830', surface2:'#2e3140', border:'#3a3d4d', text:'#dde1f0', muted:'#7a7d92', canvasBg:'#1a1c24' },
+  };
+  const t = themes[theme] || themes.light;
+  const r = document.documentElement.style;
+  r.setProperty('--bg',         t.bg);
+  r.setProperty('--surface',    t.surface);
+  r.setProperty('--surface2',   t.surface2);
+  r.setProperty('--border',     t.border);
+  r.setProperty('--text',       t.text);
+  r.setProperty('--muted',      t.muted);
+  r.setProperty('--canvas-bg',  t.canvasBg);
+  // Update grid color
+  drawGrid();
+}
+
+function applyTextSize(size) {
+  const scales = { sm: '12px', md: '13px', lg: '15px' };
+  document.documentElement.style.setProperty('--font-size-base', scales[size] || '13px');
+}
+
+function obEnter() {
+  // Stop mic test if running
+  if (obMicStream) { obMicStream.getTracks().forEach(t => t.stop()); obMicStream = null; }
+  if (obWaveAnim)  { cancelAnimationFrame(obWaveAnim); obWaveAnim = null; }
+  if (obAudioContext) { obAudioContext.close(); obAudioContext = null; }
+
+  // Apply API key
+  API_KEY = obSettings.apiKey;
+
+  // Apply theme + text size + accent
+  applyTheme(obSettings.theme);
+  applyTextSize(obSettings.textSize);
+  document.documentElement.style.setProperty('--accent', obSettings.accent);
+
+  // Apply silence timer
+  silenceDelay   = Math.round(obSettings.silenceDelay * 1000);
+  silenceEnabled = true;
+  const slider = document.getElementById('silence-slider');
+  if (slider) { slider.value = obSettings.silenceDelay; }
+  const valEl = document.getElementById('silence-val');
+  if (valEl) valEl.textContent = obSettings.silenceDelay.toFixed(1) + 's';
+
+  // Remember settings if checkbox ticked
+  if (document.getElementById('ob-remember-cb').checked) {
+    localStorage.setItem(OB_STORAGE_KEY, JSON.stringify(obSettings));
+  } else {
+    localStorage.removeItem(OB_STORAGE_KEY);
+  }
+
+  // Hide onboarding
+  document.getElementById('onboarding').classList.add('hidden');
+
+  // Update sendCommand guard — key is now set
+  addLog('Welcome to Inator. Board is ready.', 'info');
+  addLog('Say "Hey Wall …command… Send it" to get started.', 'info');
+}
+
+// ── Check for remembered settings on load ─────────────────
+function obCheckRemembered() {
+  try {
+    const saved = localStorage.getItem(OB_STORAGE_KEY);
+    if (!saved) { return false; }
+    const s = JSON.parse(saved);
+    if (!s || !s.apiKey || s.apiKey.length < 20) { return false; }
+    obSettings = s;
+    return true;
+  } catch(e) { return false; }
+}
+
+// ── Return banner ──────────────────────────────────────────
+document.getElementById('rb-enter-btn').onclick = () => {
+  // Apply saved settings and enter directly
+  API_KEY = obSettings.apiKey;
+  applyTheme(obSettings.theme);
+  applyTextSize(obSettings.textSize);
+  document.documentElement.style.setProperty('--accent', obSettings.accent);
+  silenceDelay   = Math.round(obSettings.silenceDelay * 1000);
+  silenceEnabled = true;
+  document.getElementById('ob-return-banner').classList.remove('show');
+  document.getElementById('onboarding').classList.add('hidden');
+  addLog('Welcome back. Board is ready.', 'info');
+};
+
+document.getElementById('rb-change-btn').onclick = () => {
+  // Go to full wizard
+  document.getElementById('ob-return-banner').classList.remove('show');
+  // Pre-fill the API key field
+  document.getElementById('ob-api-key').value = obSettings.apiKey;
+};
+
+// ── Init: show wizard or return banner ─────────────────────
+if (obCheckRemembered()) {
+  document.getElementById('onboarding').classList.add('hidden');
+  document.getElementById('ob-return-banner').classList.add('show');
+} else {
+  document.getElementById('onboarding').classList.remove('hidden');
+}
 </script>
+
+<!-- ══════════════════════════════════════
+     RETURN BANNER (remembered settings)
+══════════════════════════════════════ -->
+<div id="ob-return-banner">
+  <span class="rb-logo">◈ INATOR-PROTOTYPE-1</span>
+  <span class="rb-msg">Welcome back — using your saved settings</span>
+  <div class="rb-btn-row">
+    <button class="rb-enter" id="rb-enter-btn">Enter the Board</button>
+    <button class="rb-change" id="rb-change-btn">Change Settings</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ONBOARDING WIZARD
+══════════════════════════════════════ -->
+<div id="onboarding">
+  <div id="ob-container">
+
+    <!-- Progress dots -->
+    <div id="ob-dots">
+      <div class="ob-dot active" data-page="0"></div>
+      <div class="ob-dot" data-page="1"></div>
+      <div class="ob-dot" data-page="2"></div>
+      <div class="ob-dot" data-page="3"></div>
+      <div class="ob-dot" data-page="4"></div>
+      <div class="ob-dot" data-page="5"></div>
+    </div>
+
+    <!-- Page 0: Welcome -->
+    <div class="ob-page active" id="ob-page-0">
+      <div class="ob-eyebrow">◈ Inator-Prototype-1</div>
+      <div class="ob-title">Your AI-powered<br>meeting room.</div>
+      <div class="ob-subtitle">Voice-controlled whiteboards, live data, and real-time collaboration. Let's get you set up in under a minute.</div>
+      <div class="ob-btn-row">
+        <button class="ob-btn primary" onclick="obNext()">Get Started →</button>
+      </div>
+    </div>
+
+    <!-- Page 1: API Key -->
+    <div class="ob-page" id="ob-page-1">
+      <div class="ob-eyebrow">Step 1 of 5</div>
+      <div class="ob-title">Connect to Claude.</div>
+      <div class="ob-subtitle">Inator uses Anthropic's Claude API for all AI commands. Your key is stored in memory only — never saved to disk.</div>
+      <div class="ob-field">
+        <label class="ob-label">Anthropic API Key</label>
+        <input class="ob-input" id="ob-api-key" type="password" placeholder="sk-ant-..." oninput="obClearStatus('ob-key-status')" />
+        <div class="ob-status" id="ob-key-status"></div>
+      </div>
+      <div class="ob-btn-row">
+        <button class="ob-btn secondary" onclick="obBack()">←</button>
+        <button class="ob-btn primary" id="ob-key-btn" onclick="obTestKey()">Test & Continue</button>
+      </div>
+    </div>
+
+    <!-- Page 2: Appearance -->
+    <div class="ob-page" id="ob-page-2">
+      <div class="ob-eyebrow">Step 2 of 5</div>
+      <div class="ob-title">Make it yours.</div>
+      <div class="ob-subtitle">Choose how the board looks and feels.</div>
+
+      <label class="ob-label">Board theme</label>
+      <div class="ob-choices cols3" id="ob-theme-choices">
+        <div class="ob-choice selected" data-val="light" onclick="obChoice(this,'ob-theme-choices')">
+          <span class="ch-icon">☀️</span>
+          <span class="ch-label">Light</span>
+          <span class="ch-desc">Clean white canvas</span>
+        </div>
+        <div class="ob-choice" data-val="dark" onclick="obChoice(this,'ob-theme-choices')">
+          <span class="ch-icon">🌙</span>
+          <span class="ch-label">Dark</span>
+          <span class="ch-desc">Easy on the eyes</span>
+        </div>
+        <div class="ob-choice" data-val="slate" onclick="obChoice(this,'ob-theme-choices')">
+          <span class="ch-icon">🪨</span>
+          <span class="ch-label">Slate</span>
+          <span class="ch-desc">Neutral gray</span>
+        </div>
+      </div>
+
+      <label class="ob-label" style="margin-top:8px">Text size</label>
+      <div class="ob-choices cols3" id="ob-size-choices">
+        <div class="ob-choice" data-val="sm" onclick="obChoice(this,'ob-size-choices')">
+          <span class="ch-label" style="font-size:11px">Small</span>
+          <span class="ch-desc">Laptop / desktop</span>
+        </div>
+        <div class="ob-choice selected" data-val="md" onclick="obChoice(this,'ob-size-choices')">
+          <span class="ch-label">Medium</span>
+          <span class="ch-desc">Default</span>
+        </div>
+        <div class="ob-choice" data-val="lg" onclick="obChoice(this,'ob-size-choices')">
+          <span class="ch-label" style="font-size:16px">Large</span>
+          <span class="ch-desc">Big displays</span>
+        </div>
+      </div>
+
+      <label class="ob-label" style="margin-top:8px">Accent color</label>
+      <div class="ob-colors" id="ob-accent-colors">
+        <div class="ob-color selected" data-color="#5b4de0" style="background:#5b4de0" onclick="obAccent(this)"></div>
+        <div class="ob-color" data-color="#0ea5e9" style="background:#0ea5e9" onclick="obAccent(this)"></div>
+        <div class="ob-color" data-color="#10b981" style="background:#10b981" onclick="obAccent(this)"></div>
+        <div class="ob-color" data-color="#f59e0b" style="background:#f59e0b" onclick="obAccent(this)"></div>
+        <div class="ob-color" data-color="#ef4444" style="background:#ef4444" onclick="obAccent(this)"></div>
+        <div class="ob-color" data-color="#ec4899" style="background:#ec4899" onclick="obAccent(this)"></div>
+        <div class="ob-color" data-color="#8b5cf6" style="background:#8b5cf6" onclick="obAccent(this)"></div>
+      </div>
+
+      <div class="ob-btn-row">
+        <button class="ob-btn secondary" onclick="obBack()">←</button>
+        <button class="ob-btn primary" onclick="obNext()">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Page 3: Voice -->
+    <div class="ob-page" id="ob-page-3">
+      <div class="ob-eyebrow">Step 3 of 5</div>
+      <div class="ob-title">Set up your voice.</div>
+      <div class="ob-subtitle">Say "Hey Wall" to activate, "Send it" when done. Pick your microphone and set how long to wait before auto-sending.</div>
+
+      <div class="ob-field">
+        <label class="ob-label">Microphone</label>
+        <select class="ob-input" id="ob-mic-select">
+          <option value="">Loading devices…</option>
+        </select>
+      </div>
+
+      <canvas id="ob-waveform"></canvas>
+      <div class="ob-status info" id="ob-mic-status">Click "Test mic" to check your audio</div>
+
+      <div class="ob-slider-row" style="margin-top:16px">
+        <label>Silence timer</label>
+        <input type="range" id="ob-silence-slider" min="0.5" max="4" value="1.8" step="0.1"
+               oninput="document.getElementById('ob-silence-val').textContent=parseFloat(this.value).toFixed(1)+'s'" />
+        <span class="ob-silence-val ob-slider-val" id="ob-silence-val">1.8s</span>
+      </div>
+
+      <div class="ob-btn-row" style="margin-top:8px">
+        <button class="ob-btn secondary" onclick="obBack()">←</button>
+        <button class="ob-btn secondary" onclick="obTestMic()" id="ob-mic-test-btn">Test mic</button>
+        <button class="ob-btn primary" onclick="obNext()">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Page 4: Presence -->
+    <div class="ob-page" id="ob-page-4">
+      <div class="ob-eyebrow">Step 4 of 5</div>
+      <div class="ob-title">Presence &amp; tracking.</div>
+      <div class="ob-subtitle">Inator can watch for your face to enable voice commands, and track your finger for pointing at elements.</div>
+
+      <div class="ob-toggle-row">
+        <div class="tg-info">
+          <span class="tg-label">Face detection</span>
+          <span class="tg-desc">Enables soft wake phrases when looking at camera</span>
+        </div>
+        <button class="ob-toggle on" id="ob-face-toggle" onclick="obToggle(this)"></button>
+      </div>
+      <div class="ob-toggle-row">
+        <div class="tg-info">
+          <span class="tg-label">Finger tracking</span>
+          <span class="tg-desc">Point at elements to reference them in commands</span>
+        </div>
+        <button class="ob-toggle on" id="ob-finger-toggle" onclick="obToggle(this)"></button>
+      </div>
+
+      <div class="ob-field" style="margin-top:16px">
+        <label class="ob-label">Camera</label>
+        <select class="ob-input" id="ob-cam-select">
+          <option value="">Loading devices…</option>
+        </select>
+      </div>
+
+      <div class="ob-btn-row">
+        <button class="ob-btn secondary" onclick="obBack()">←</button>
+        <button class="ob-btn primary" onclick="obNext()">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Page 5: Ready -->
+    <div class="ob-page" id="ob-page-5">
+      <div class="ob-eyebrow">All set</div>
+      <div class="ob-title">Ready to go.</div>
+      <div class="ob-subtitle">Here's a summary of your setup. You can change anything later from Settings.</div>
+
+      <div class="ob-summary" id="ob-summary"></div>
+
+      <label class="ob-remember">
+        <input type="checkbox" id="ob-remember-cb" />
+        Remember these settings next time
+      </label>
+
+      <div class="ob-btn-row">
+        <button class="ob-btn secondary" onclick="obBack()">←</button>
+        <button class="ob-btn primary" onclick="obEnter()">Enter the Board →</button>
+      </div>
+    </div>
+
+  </div><!-- /ob-container -->
+</div><!-- /onboarding -->
+
 </body>
 </html>
